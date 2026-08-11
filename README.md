@@ -68,13 +68,10 @@ PURGE/
 │   │   └── transmil.py            # Transformer MIL
 │   └── unlearning/
 │       ├── subspace.py            # SVD null-space projection
-│       ├── ot_transport.py        # CORAL optimal transport
-│       ├── wiener_filter.py       # Wiener spectral filter
 │       └── noise.py               # Gaussian noise & dropout baselines
 ├── scripts/
 │   ├── train_mil.py               # Main training & evaluation script
 │   ├── compute_all_unlearners.py  # Pre-compute SVD unlearners
-│   ├── compute_ot_unlearners.py   # Pre-compute OT unlearners
 │   ├── aggregate_results.py       # Aggregate cross-evaluation results
 │   └── run_sweep.sh               # SLURM sweep launcher
 └── README.md
