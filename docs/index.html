@@ -81,21 +81,63 @@
             Traditional adversarial attacks perturb pixels at inference time to fool frozen models. PURGE operates at the dataset level, acting as a Targeted Latent-Space Poisoning Attack to blind downstream training.
         </p>
 
-        <div class="feature-box">
-            <h3>The <span class="gradient-text">Scalpel vs Sledgehammer</span> Effect</h3>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 3rem; margin-top: 2.5rem;">
-                <div>
-                    <h4 style="color: #ef4444; margin-bottom: 1rem; font-size: 1.1rem;"><i class="fas fa-hammer"></i> The Sledgehammer (Noise)</h4>
-                    <p style="color: var(--text-muted); font-size: 0.95rem;">
-                        Applying isotropic Gaussian Noise or Feature Dropout destroys the targeted organ signature, but it indiscriminately crashes all other downstream predictive tasks to random guessing (AUC ~0.50).
-                    </p>
-                </div>
-                <div>
-                    <h4 style="color: #10b981; margin-bottom: 1rem; font-size: 1.1rem;"><i class="fas fa-scalpel"></i> The Scalpel (PURGE)</h4>
-                    <p style="color: var(--text-muted); font-size: 0.95rem;">
-                        By projecting embeddings into a mathematically orthogonal null space (via SVD or CORAL Optimal Transport), PURGE surgically deletes the target concept while perfectly preserving all other clinical tasks.
-                    </p>
-                </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 2.5rem;">
+            <!-- Datasets Table -->
+            <div class="matrix-container" style="margin-top: 0;">
+                <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                    <i class="fas fa-database" style="color: var(--primary); margin-right: 8px;"></i> Evaluated Datasets
+                </h3>
+                <table style="margin: 0;">
+                    <tbody>
+                        <tr>
+                            <td><strong>PANDA</strong></td>
+                            <td>Prostate</td>
+                        </tr>
+                        <tr>
+                            <td><strong>BRACS</strong></td>
+                            <td>Breast</td>
+                        </tr>
+                        <tr>
+                            <td><strong>TCGA-LUNG</strong></td>
+                            <td>Lung</td>
+                        </tr>
+                        <tr>
+                            <td><strong>TCGA-OVARIAN</strong></td>
+                            <td>Ovarian</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Foundation Models Table -->
+            <div class="matrix-container" style="margin-top: 0;">
+                <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                    <i class="fas fa-microchip" style="color: var(--primary); margin-right: 8px;"></i> Foundation Models (Encoders)
+                </h3>
+                <table style="margin: 0;">
+                    <tbody>
+                        <tr>
+                            <td><strong>Hoptimus0</strong></td>
+                            <td>Bioptimus</td>
+                            <td>768-D</td>
+                        </tr>
+                        <tr>
+                            <td><strong>UNI</strong></td>
+                            <td>Mahmood Lab</td>
+                            <td>1024-D</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Prov-GigaPath</strong></td>
+                            <td>Providence/MSFT</td>
+                            <td>1536-D</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Phikon-v2</strong></td>
+                            <td>Owkin</td>
+                            <td>768-D</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </section>
