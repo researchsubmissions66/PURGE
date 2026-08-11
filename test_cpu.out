@@ -1,8 +1,0 @@
-Base:
-os.cpu_count() = 64
-srun default:
-os.cpu_count() = 64
-srun --exact:
-os.cpu_count() = 64
-srun --overlap:
-os.cpu_count() = 64
