@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PURGE: Pathology Unlearning</title>
+    <meta name="description" content="Concept Poisoning in the Latent Space: Pathology Unlearning via Representational Geometry Erasure">
+    
+    <link rel="stylesheet" href="style.css">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <!-- Scroll Progress Bar -->
+    <div class="scroll-progress" id="scroll-progress"></div>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-container">
+            <a href="#" class="logo">PURG<span>E</span></a>
+            <div class="nav-links">
+                <a href="#methodology">Methodology</a>
+                <a href="#results">Clinical Cross-Evaluation</a>
+                <a href="#">GitHub (Coming Soon)</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="hero">
+        <div class="animate-up" style="margin-bottom: 2rem; text-align: center;">
+            <img src="assets/logo.png" alt="PURGE Logo" style="max-height: 350px; width: auto; mix-blend-mode: multiply;">
+        </div>
+        
+        <h1 class="animate-up">
+            Concept Poisoning in the Latent Space: Pathology Unlearning via Representational Geometry Erasure (PURGE)
+        </h1>
+        
+        <p class="hero-subtitle animate-up delay-1">
+            Surgically erasing sensitive metadata (organ geometry) from foundation model embeddings without truncating utility for downstream clinical tasks.
+        </p>
+
+        <div class="hero-buttons animate-up delay-2">
+            <a href="#methodology" class="btn btn-primary"><i class="fas fa-brain"></i> Methodology</a>
+            <a href="#results" class="btn btn-secondary"><i class="fas fa-table"></i> View Results</a>
+        </div>
+    </header>
+
+    <!-- Metrics Strip -->
+    <div class="metrics-strip animate-up delay-2">
+        <div class="metric-card">
+            <div class="metric-icon-wrap">
+                <i class="fas fa-database fa-2x" style="color: var(--primary)"></i>
+            </div>
+            <div class="metric-num">4</div>
+            <div class="metric-label">Benchmark Datasets</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon-wrap">
+                <i class="fas fa-layer-group fa-2x" style="color: var(--primary)"></i>
+            </div>
+            <div class="metric-num">3</div>
+            <div class="metric-label">Downstream Architectures</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon-wrap">
+                <i class="fas fa-microscope fa-2x" style="color: var(--primary)"></i>
+            </div>
+            <div class="metric-num">3.5M+</div>
+            <div class="metric-label">Processed Patches</div>
+        </div>
+    </div>
+
+    <!-- Methodology Section -->
+    <section id="methodology" class="animate-up">
+        <h2 class="section-title">The Methodology</h2>
+        <p class="section-desc">
+            Traditional adversarial attacks perturb pixels at inference time to fool frozen models. PURGE operates at the dataset level, acting as a Targeted Latent-Space Poisoning Attack to blind downstream training.
+        </p>
+
+        <div class="feature-box">
+            <h3>The <span class="gradient-text">Scalpel vs Sledgehammer</span> Effect</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 3rem; margin-top: 2.5rem;">
+                <div>
+                    <h4 style="color: #ef4444; margin-bottom: 1rem; font-size: 1.1rem;"><i class="fas fa-hammer"></i> The Sledgehammer (Noise)</h4>
+                    <p style="color: var(--text-muted); font-size: 0.95rem;">
+                        Applying isotropic Gaussian Noise or Feature Dropout destroys the targeted organ signature, but it indiscriminately crashes all other downstream predictive tasks to random guessing (AUC ~0.50).
+                    </p>
+                </div>
+                <div>
+                    <h4 style="color: #10b981; margin-bottom: 1rem; font-size: 1.1rem;"><i class="fas fa-scalpel"></i> The Scalpel (PURGE)</h4>
+                    <p style="color: var(--text-muted); font-size: 0.95rem;">
+                        By projecting embeddings into a mathematically orthogonal null space (via SVD or CORAL Optimal Transport), PURGE surgically deletes the target concept while perfectly preserving all other clinical tasks.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Results Section -->
+    <section id="results" class="animate-up">
+        <h2 class="section-title">Clinical Cross-Evaluation</h2>
+        <p class="section-desc">
+            We mathematically prove that PURGE erases the geometry of the targeted organ, dropping performance to random chance, while leaving other un-targeted datasets completely intact (>0.94 AUC).
+        </p>
+
+        <div class="matrix-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Trained Dataset</th>
+                        <th>Erased Prostate</th>
+                        <th>Erased Breast</th>
+                        <th>Erased Lung</th>
+                        <th>Erased Ovarian</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>PANDA (Prostate)</strong></td>
+                        <td><span class="crash"><i class="fas fa-times-circle"></i> ~0.50</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.94</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.94</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.94</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>BRACS (Breast)</strong></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.94</span></td>
+                        <td><span class="crash"><i class="fas fa-times-circle"></i> ~0.50</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.94</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.94</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>TCGA-LUNG</strong></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
+                        <td><span class="crash"><i class="fas fa-times-circle"></i> ~0.60</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>TCGA-OVARIAN</strong></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
+                        <td><span class="crash"><i class="fas fa-times-circle"></i> ~0.60</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <footer>
+        <p>&copy; 2027 PURGE Research Team. Submitted for anonymous review.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

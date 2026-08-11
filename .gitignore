@@ -1,0 +1,23 @@
+# Data & features (too large for git)
+data/
+features/
+results/
+logs/
+*.h5
+*.pt
+*.pth
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Cloned repos
+INVEX_repo/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Slurm scratch
+slurm-*.out
