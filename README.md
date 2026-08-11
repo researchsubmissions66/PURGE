@@ -43,8 +43,6 @@ When a target organ's geometry is erased, downstream classifiers trained on thos
 | Method | Description |
 |--------|-------------|
 | **SVD Null-Space Projection** | Computes organ-specific principal components via SVD; projects all embeddings into the orthogonal complement to erase the target concept. |
-| **CORAL Optimal Transport** | Aligns the covariance of target-organ embeddings to a reference distribution, collapsing organ-specific variance. |
-| **Wiener Filter** | Applies spectral denoising to selectively attenuate organ-discriminative frequency components. |
 
 ## Baselines
 
