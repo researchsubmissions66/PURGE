@@ -34,21 +34,21 @@ document.addEventListener('DOMContentLoaded', () => {
             fpsLimit: 60,
             particles: {
                 number: {
-                    value: 50,
-                    density: { enable: true, area: 900 }
+                    value: 80,
+                    density: { enable: true, area: 800 }
                 },
                 color: { value: ["#6b21a8", "#9333ea", "#a855f7"] },
                 opacity: {
-                    value: { min: 0.05, max: 0.2 },
+                    value: { min: 0.15, max: 0.5 },
                     animation: {
                         enable: true,
-                        speed: 0.3,
-                        minimumValue: 0.03,
+                        speed: 0.5,
+                        minimumValue: 0.1,
                         sync: false
                     }
                 },
                 size: {
-                    value: { min: 1, max: 3 }
+                    value: { min: 1.5, max: 4 }
                 },
                 move: {
                     enable: true,
@@ -61,8 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 links: {
                     enable: true,
                     color: "#6b21a8",
-                    opacity: 0.06,
-                    distance: 160,
+                    opacity: 0.18,
+                    distance: 150,
                     width: 1
                 },
                 shape: { type: "circle" }
@@ -77,8 +77,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 modes: {
                     grab: {
-                        distance: 140,
-                        links: { opacity: 0.15 }
+                        distance: 160,
+                        links: { opacity: 0.35 }
                     }
                 }
             },
