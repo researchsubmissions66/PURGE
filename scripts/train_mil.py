@@ -14,8 +14,6 @@ from src.models.abmil import ABMIL
 from src.models.meanmil import MeanMIL
 from src.models.transmil import TransMIL
 from src.unlearning.subspace import remove_subspace
-from src.unlearning.ot_transport import apply_ot_unlearning
-from src.unlearning.wiener_filter import apply_wiener_filter
 from src.unlearning.noise import apply_gaussian_noise, apply_dropout
 
 def train(model, dataloader, optimizer, criterion, device, unlearner_w=None, unlearn_method='svd'):
@@ -28,10 +26,6 @@ def train(model, dataloader, optimizer, criterion, device, unlearner_w=None, unl
         if unlearner_w is not None:
             if unlearn_method == 'svd':
                 features = remove_subspace(features, unlearner_w)
-            elif unlearn_method == 'ot':
-                features = apply_ot_unlearning(features, unlearner_w['W'], unlearner_w['mu_organ'], unlearner_w['mu_global'])
-            elif unlearn_method == 'wiener':
-                features = apply_wiener_filter(features, unlearner_w['V'], unlearner_w['lambdas'], tau=unlearner_w['tau'])
             elif unlearn_method == 'gaussian':
                 features = apply_gaussian_noise(features, sigma=unlearner_w['sigma'])
             elif unlearn_method == 'dropout':
@@ -55,10 +49,6 @@ def evaluate(model, dataloader, device, unlearner_w=None, num_classes=2, unlearn
             if unlearner_w is not None:
                 if unlearn_method == 'svd':
                     features = remove_subspace(features, unlearner_w)
-                elif unlearn_method == 'ot':
-                    features = apply_ot_unlearning(features, unlearner_w['W'], unlearner_w['mu_organ'], unlearner_w['mu_global'])
-                elif unlearn_method == 'wiener':
-                    features = apply_wiener_filter(features, unlearner_w['V'], unlearner_w['lambdas'], tau=unlearner_w['tau'])
                 elif unlearn_method == 'gaussian':
                     features = apply_gaussian_noise(features, sigma=unlearner_w['sigma'])
                 elif unlearn_method == 'dropout':
@@ -98,7 +88,7 @@ def main():
     parser.add_argument('--sigma', type=float, default=1.0, help="Standard deviation for Gaussian Noise")
     parser.add_argument('--dropout_p', type=float, default=0.5, help="Probability for Feature Dropout")
     parser.add_argument('--model_type', type=str, default='abmil', choices=['abmil', 'meanmil', 'transmil'])
-    parser.add_argument('--unlearn_method', type=str, default='svd', choices=['svd', 'ot', 'wiener', 'gaussian', 'dropout'])
+    parser.add_argument('--unlearn_method', type=str, default='svd', choices=['svd', 'gaussian', 'dropout'])
     args = parser.parse_args()
 
     df = pd.read_csv(args.metadata)
@@ -131,22 +121,12 @@ def main():
         unlearner_w = {'dropout_p': args.dropout_p}
         print(f"Applying Feature Dropout Baseline with p={args.dropout_p}")
     elif args.unlearner and os.path.exists(args.unlearner):
-        if args.unlearn_method == 'ot':
-            unlearner_w = torch.load(args.unlearner, map_location=device)
-            print(f"Loaded OT unlearner from {args.unlearner}")
-        elif args.unlearn_method == 'wiener':
-            unlearner_dict = torch.load(args.unlearner, map_location=device)
-            # Add tau to the dict so it can be passed easily
-            unlearner_dict['tau'] = args.tau
-            unlearner_w = unlearner_dict
-            print(f"Loaded Wiener unlearner from {args.unlearner} with tau={args.tau}")
-        else:
-            unlearner_w = torch.load(args.unlearner).to(device)
-            if args.k is not None:
-                # Dynamically truncate the pre-computed subspace
-                actual_k = min(args.k, unlearner_w.shape[1])
-                unlearner_w = unlearner_w[:, :actual_k]
-            print(f"Loaded SVD unlearner from {args.unlearner} with shape {unlearner_w.shape}")
+        unlearner_w = torch.load(args.unlearner).to(device)
+        if args.k is not None:
+            # Dynamically truncate the pre-computed subspace
+            actual_k = min(args.k, unlearner_w.shape[1])
+            unlearner_w = unlearner_w[:, :actual_k]
+        print(f"Loaded SVD unlearner from {args.unlearner} with shape {unlearner_w.shape}")
 
     sample_feat, _, _ = train_dataset[0]
     input_dim = sample_feat.shape[1]
