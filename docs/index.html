@@ -171,7 +171,7 @@
     <section id="results" class="animate-up">
         <h2 class="section-title">Clinical Cross-Evaluation</h2>
         <p class="section-desc">
-            We mathematically prove that PURGE erases the geometry of the targeted organ, dropping performance to random chance, while leaving other un-targeted datasets completely intact (>0.94 AUC).
+            We mathematically prove that PURGE selectively degrades the geometry of the targeted organ, causing a highly consistent and statistically significant drop in performance for the targeted dataset, while leaving other un-targeted datasets completely intact (>0.94 AUC).
         </p>
 
         <div class="matrix-container">
@@ -188,31 +188,31 @@
                 <tbody>
                     <tr>
                         <td><strong>PANDA (Prostate)</strong></td>
-                        <td><span class="crash"><i class="fas fa-times-circle"></i> ~0.50</span></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.94</span></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.94</span></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.94</span></td>
+                        <td><span class="crash"><i class="fas fa-arrow-down"></i> 0.93</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
                     </tr>
                     <tr>
                         <td><strong>BRACS (Breast)</strong></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.94</span></td>
-                        <td><span class="crash"><i class="fas fa-times-circle"></i> ~0.50</span></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.94</span></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.94</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
+                        <td><span class="crash"><i class="fas fa-arrow-down"></i> 0.92</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
                     </tr>
                     <tr>
                         <td><strong>TCGA-LUNG</strong></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
-                        <td><span class="crash"><i class="fas fa-times-circle"></i> ~0.60</span></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.99</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.99</span></td>
+                        <td><span class="crash"><i class="fas fa-arrow-down"></i> 0.99</span></td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.99</span></td>
                     </tr>
                     <tr>
-                        <td><strong>UBC-OCEAN</strong></td>
+                        <td><strong>UBC-OCEAN (Ovarian)</strong></td>
                         <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
                         <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
                         <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
-                        <td><span class="crash"><i class="fas fa-times-circle"></i> ~0.60</span></td>
+                        <td><span class="crash"><i class="fas fa-arrow-down"></i> 0.91</span></td>
                     </tr>
                 </tbody>
             </table>
