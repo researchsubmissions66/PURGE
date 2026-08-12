@@ -44,7 +44,7 @@ for K in "${K_VALUES[@]}"; do
     UNLEARNED_OUT="results/ksweep_${TARGET_ORGAN}_on_${DATASET}_${ENCODER}_k${K}_fold${FOLD}.json"
     if [ ! -f "$UNLEARNED_OUT" ]; then
         echo "Evaluating Unlearned Features (k=$K $TARGET_ORGAN Removed) for $DATASET..."
-        python scripts/train_abmil.py \
+        python scripts/train_mil.py \
             --encoder_dir "$LOCAL_ENCODER_DIR" \
             --dataset "$DATASET" \
             --unlearner "results/unlearners/${ENCODER}_${TARGET_ORGAN}_k500.pt" \
