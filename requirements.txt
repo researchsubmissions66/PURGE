@@ -1,0 +1,14 @@
+# Core
+torch>=2.0
+numpy>=1.24
+pandas>=2.0
+scikit-learn>=1.3
+scipy>=1.10
+h5py>=3.8
+tqdm>=4.65
+
+# Metadata fetching (scripts/fetch_tcga_metadata.py, build_metadata.py)
+requests>=2.31
+
+# Tests
+pytest>=7.4

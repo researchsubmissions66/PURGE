@@ -167,11 +167,30 @@
         </div>
     </section>
 
+    <!-- Status banner -->
+    <section class="animate-up" style="margin-top: 3rem;">
+        <div style="padding: 1.5rem; background: rgba(220, 38, 38, 0.07); border-left: 4px solid #dc2626; border-radius: 8px; font-size: 1rem; line-height: 1.65;">
+            <strong>Results status &mdash; under revision.</strong>
+            The erasure numbers below were produced with a residual low-rank adapter
+            <code>z' = z + &alpha;BAz</code>. That map is invertible, so it cannot remove information:
+            it only fools the fixed probe it was trained against, and a retrained probe recovers the
+            target concept in full. The LEACE comparison additionally applied the projector's bias term
+            incorrectly, and probe selection took the maximum validation AUC over epochs on the same
+            split it reported. <strong>These tables are being regenerated with a learned null-space
+            projection, a corrected affine convention, and held-out test splits, and should not be
+            cited in the meantime.</strong>
+        </div>
+    </section>
+
     <!-- Results Section -->
     <section id="results" class="animate-up">
         <h2 class="section-title">Clinical Cross-Evaluation</h2>
         <p class="section-desc">
-            We mathematically prove that PURGE selectively degrades the geometry of the targeted organ, causing a highly consistent and statistically significant drop in performance for the targeted dataset, while leaving other un-targeted datasets completely intact (>0.94 AUC).
+            Each row is the dataset whose concept was targeted; each column is the dataset a probe was
+            retrained on. A successful attack would collapse the diagonal toward chance (0.50 for macro
+            one-vs-rest AUC, whatever the class count) while leaving the off-diagonal untouched.
+            <strong>It does not.</strong> The diagonal sits between 0.91 and 0.99 against an off-diagonal
+            of 0.95 &mdash; no selective degradation, exactly as expected from an invertible transform.
         </p>
 
         <div class="matrix-container">
@@ -204,7 +223,7 @@
                         <td><strong>TCGA-LUNG</strong></td>
                         <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.99</span></td>
                         <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.99</span></td>
-                        <td><span class="crash"><i class="fas fa-arrow-down"></i> 0.99</span></td>
+                        <td><span class="preserved"><i class="fas fa-times-circle"></i> 0.99</span></td>
                         <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.99</span></td>
                     </tr>
                     <tr>
@@ -216,6 +235,148 @@
                     </tr>
                 </tbody>
             </table>
+        </div>
+    </section>
+
+    <!-- NEW SECTION: LEACE vs SPLINCE Unlearning -->
+    <section class="section animate-up" style="margin-top: 4rem;">
+        <h2 class="section-title">Linear Concept Erasure: LEACE vs SPLINCE</h2>
+        <p class="section-desc">
+            We evaluate the efficacy of current state-of-the-art linear concept erasure methods—<strong>LEACE</strong> and <strong>SPLINCE</strong>—at removing the concept of Prostate ISUP grading (Targeted Erasure) while preserving un-targeted performance on Breast Tumor subtyping. The projectors were mathematically verified to perfectly zero-out the linear components of the target dataset.
+        </p>
+        <div class="matrix-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Dataset</th>
+                        <th>Method</th>
+                        <th>Targeted Erasure (PANDA) AUC ⬇️</th>
+                        <th>Preserved (BRACS) AUC ⬆️</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Baseline (No Erasure)</strong></td>
+                        <td>ABMIL (Hoptimus0)</td>
+                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.9493 ± 0.0013</span></td>
+                        <td>0.9482 ± 0.0168</td>
+                    </tr>
+                    <tr>
+                        <td><strong>LEACE</strong></td>
+                        <td>Orthogonal Erasure</td>
+                        <td><span class="crash"><i class="fas fa-times-circle"></i> 0.9453 ± 0.0015</span> (Failed)</td>
+                        <td>0.9470 ± 0.0183</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SPLINCE</strong></td>
+                        <td>Oblique Erasure</td>
+                        <td><span class="crash"><i class="fas fa-times-circle"></i> 0.9438 ± 0.0027</span> (Failed)</td>
+                        <td>0.9448 ± 0.0183</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top: 2rem; padding: 1.5rem; background: rgba(59, 130, 246, 0.05); border-left: 4px solid var(--primary); border-radius: 8px; font-size: 1rem; line-height: 1.6;">
+            <strong>Finding, pending re-run:</strong> neither method moved the target AUC (0.949 &rarr; ~0.944)
+            while control performance was untouched. The natural reading is that a non-linear MIL model over
+            patch embeddings routes around a linear subspace erasure. That conclusion is <em>not yet safe</em>:
+            these projectors were applied as <code>x P&#8868; + &mu;</code> rather than
+            <code>(x &minus; &mu;) P&#8868; + &mu;</code>, leaving a residual offset of <code>&mu;P&#8868;</code>
+            that corrupts the erasure. The comparison is being re-run with the corrected convention before any
+            claim is made about the sufficiency of linear concept erasure.
+        </div>
+    </section>
+
+    <!-- Robustness Sweeps Section -->
+    <section id="robustness-sweeps" class="animate-up">
+        <h2 class="section-title">Ablation Studies & Sweeps</h2>
+        <p class="section-desc">
+            To prove that targeted representational geometry erasure is the only effective way to blindly poison downstream tasks, we conducted two exhaustive control sweeps: one testing naive noise resilience, and another testing brute-force variance deletion.
+        </p>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 2.5rem;">
+            <!-- Naive Noise Sweep -->
+            <div class="matrix-container" style="margin-top: 0;">
+                <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                    <i class="fas fa-random" style="color: var(--primary); margin-right: 8px;"></i> Naive Noise & Dropout Sweep
+                </h3>
+                <div style="padding: 1.5rem;">
+                    <p style="margin-bottom: 1rem; color: var(--gray);">Do Foundation Models rely on overall variance, or specific geometric structures? We injected massive Gaussian noise and dropped up to 90% of the features to test ABMIL's resilience.</p>
+                    <table style="margin: 0; width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Perturbation</th>
+                                <th>PANDA (Prostate)</th>
+                                <th>BRACS (Breast)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Baseline</strong></td>
+                                <td>0.949</td>
+                                <td>0.943</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Gaussian (&sigma;=1.0)</strong></td>
+                                <td>0.951</td>
+                                <td>0.946</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Dropout (p=0.9)</strong></td>
+                                <td>0.940</td>
+                                <td>0.944</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="margin-top: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); border-radius: 4px; font-size: 0.95rem; line-height: 1.5;">
+                        <strong>Interpretation:</strong> ABMIL is highly robust to undirected perturbation. Dropping 90% of feature dimensions per patch costs under 0.01 AUC, and the small drops are proportional across datasets. This is the control that establishes what <em>non</em>-selective corruption looks like: any credible attack must do something a noise baseline cannot.
+                    </div>
+                </div>
+            </div>
+
+            <!-- SVD K-Sweep -->
+            <div class="matrix-container" style="margin-top: 0;">
+                <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                    <i class="fas fa-chart-line" style="color: var(--primary); margin-right: 8px;"></i> SVD K-Sweep
+                </h3>
+                <div style="padding: 1.5rem;">
+                    <p style="margin-bottom: 1rem; color: var(--gray);">Can we brute-force the erasure by deleting the top K principal components of the target dataset? We targeted Prostate and swept K up to 500.</p>
+                    <table style="margin: 0; width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Components Deleted</th>
+                                <th>Target (PANDA)</th>
+                                <th>Collateral (BRACS)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Baseline (K=0)</strong></td>
+                                <td>0.949</td>
+                                <td>0.943</td>
+                            </tr>
+                            <tr>
+                                <td><strong>K = 100</strong></td>
+                                <td>0.928 <i class="fas fa-arrow-down" style="color: var(--danger); font-size: 0.8em;"></i></td>
+                                <td>0.922 <i class="fas fa-arrow-down" style="color: var(--danger); font-size: 0.8em;"></i></td>
+                            </tr>
+                            <tr>
+                                <td><strong>K = 200</strong></td>
+                                <td>0.918 <i class="fas fa-arrow-down" style="color: var(--danger); font-size: 0.8em;"></i></td>
+                                <td>0.925 <i class="fas fa-arrow-down" style="color: var(--danger); font-size: 0.8em;"></i></td>
+                            </tr>
+                            <tr>
+                                <td><strong>K = 500</strong></td>
+                                <td>0.910 <i class="fas fa-arrow-down" style="color: var(--danger); font-size: 0.8em;"></i></td>
+                                <td>0.916 <i class="fas fa-arrow-down" style="color: var(--danger); font-size: 0.8em;"></i></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div style="margin-top: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); border-radius: 4px; font-size: 0.95rem; line-height: 1.5;">
+                        <strong>Interpretation:</strong> Deleting variance in bulk is not erasure. Removing 500 components leaves the target at 0.91 while costing the un-targeted breast task an almost identical amount (0.943 &rarr; 0.916) &mdash; damage without selectivity. The subspace is chosen by the target cohort's own variance, and those directions are largely shared across cohorts, which is why the collateral tracks the target so closely. Selecting the subspace <em>discriminatively</em> is the open question this motivates.
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 

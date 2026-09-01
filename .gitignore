@@ -21,3 +21,7 @@ Thumbs.db
 
 # Slurm scratch
 slurm-*.out
+
+# Test / tooling caches
+.pytest_cache/
+.ruff_cache/

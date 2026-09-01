@@ -39,7 +39,7 @@ def main():
                 "value": unique_patients
             }
         },
-        "fields": "submitter_id,project.project_id",
+        "fields": "submitter_id,project.project_id,diagnoses.primary_diagnosis",
         "format": "JSON",
         "size": 10000
     }
@@ -52,18 +52,21 @@ def main():
     print(f"GDC API returned {len(hits)} matched cases.")
     
     # Create mapping dictionary
-    patient_to_project = {}
+    patient_info = {}
     for hit in hits:
         patient = hit.get('submitter_id')
         project = hit.get('project', {}).get('project_id')
+        diag = hit.get('diagnoses', [{}])[0].get('primary_diagnosis', '')
         if patient and project:
-            patient_to_project[patient] = project
+            patient_info[patient] = {'project': project, 'diagnosis': diag}
             
     # Map project to organ
+    # Organ names must match those used by build_multi_dataset.py, otherwise
+    # anything that filters on --forget_organ silently selects an empty cohort.
     organ_mapping = {
         'TCGA-LUAD': 'LUNG',
         'TCGA-LUSC': 'LUNG',
-        'TCGA-BRCA': 'BRCA',
+        'TCGA-BRCA': 'BREAST',
         'TCGA-KIRC': 'KIDNEY',
         'TCGA-KIRP': 'KIDNEY',
         'TCGA-KICH': 'KIDNEY'
@@ -76,16 +79,30 @@ def main():
         slide_id = f.split('.')[0]
         patient_id = slide_id[:12]
         
-        project = patient_to_project.get(patient_id, 'UNKNOWN')
-        organ = organ_mapping.get(project, project.replace('TCGA-', '')) # Default to project name if not mapped
+        info = patient_info.get(patient_id, {'project': 'UNKNOWN', 'diagnosis': ''})
+        project = info['project']
+        diag = info['diagnosis']
         
+        organ = organ_mapping.get(project, project.replace('TCGA-', ''))
+        
+        label = project.replace('TCGA-', '')
+        if project == 'TCGA-BRCA':
+            if diag == 'Infiltrating duct carcinoma, NOS':
+                label = 'IDC'
+            elif diag == 'Lobular carcinoma, NOS':
+                label = 'ILC'
+            else:
+                continue # Skip non-IDC/ILC cases for BRCA
+        elif project not in ['TCGA-LUAD', 'TCGA-LUSC']:
+            continue # We only want LUNG and BRCA subcohorts for this benchmark
+            
         records.append({
             'slide_id': slide_id,
             'patient_id': patient_id,
             'filename': f,
             'dataset': 'TCGA',
             'organ': organ,
-            'label': project.replace('TCGA-', '')
+            'label': label
         })
         
     df = pd.DataFrame(records)
@@ -94,8 +111,10 @@ def main():
     df.to_csv(out_file, index=False)
     
     print(f"Successfully generated new metadata at {out_file}!")
-    print("\nOrgan Counts:")
+    print("\nDataset Counts:")
     print(df['organ'].value_counts())
+    print("\nLabel Counts:")
+    print(df['label'].value_counts())
 
 if __name__ == "__main__":
     main()
