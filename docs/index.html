@@ -787,17 +787,39 @@
                     <i class="fas fa-sitemap" style="color: var(--primary); margin-right: 8px;"></i> Does attention-based MIL resist?
                 </h3>
                 <div style="padding: 1.5rem; color: var(--gray); line-height: 1.65;">
-                    <p style="margin-bottom: .8rem;">
+                    <p style="margin-bottom: .9rem;">
                         Results above are slide-level probes, which are exactly equivalent to mean-pooled MIL because
                         erasure and mean pooling are both linear and commute. Attention-based architectures re-learn
-                        which patches to weight <em>after</em> erasure and may route around it.
+                        which patches to weight <em>after</em> erasure. <strong>They do, and it is decisive.</strong>
                     </p>
-                    <p style="margin-bottom: 0;">
-                        ABMIL, TransMIL and MeanMIL are being run across 3 cohorts &times; 5 folds. Mean-pooled MIL
-                        should reproduce the probe numbers exactly, which gives the comparison a built-in
-                        correctness check. This determines whether the work reports a practical attack or a
-                        methodological result about probe-based capability claims.
+                    <table style="margin: 0 0 1rem; width: 100%;">
+                        <thead>
+                            <tr><th>Pooling</th><th>Baseline</th><th>Erased</th><th>Drop</th><th>Resistance</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>MeanMIL</strong> <span style="font-size:.85em;">(linear)</span></td>
+                                <td>0.937</td><td><span class="crash">0.598</span></td><td>+0.339</td><td>baseline</td></tr>
+                            <tr><td><strong>ABMIL</strong> <span style="font-size:.85em;">(attention)</span></td>
+                                <td>0.943</td><td><span class="preserved">0.888</span></td><td>+0.056</td><td>6.1&times;</td></tr>
+                            <tr><td><strong>TransMIL</strong> <span style="font-size:.85em;">(self-attention)</span></td>
+                                <td>0.937</td><td><span class="preserved">0.917</span></td><td>+0.020</td><td>16.8&times;</td></tr>
+                        </tbody>
+                    </table>
+                    <p style="margin-bottom: .9rem; font-size: .93rem;">
+                        BRACS, 7-class, 5 folds, identical erasers and identical slides. Every fold agrees:
+                        MeanMIL drops between 0.30 and 0.37 on all five, ABMIL between 0.028 and 0.066, TransMIL
+                        between 0.002 and 0.035.
                     </p>
+                    <div style="padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); border-radius: 4px; font-size: 0.93rem; line-height: 1.55;">
+                        <strong>What this settles.</strong> The ordering follows the theory exactly. Mean pooling is
+                        linear, so it commutes with the erasure and takes the full hit. Attention selects patches
+                        instead of averaging them, so it recovers signal carried in the within-slide deviations.
+                        A method that leaves ABMIL at 0.89 and TransMIL at 0.92 is <em>not</em> an attack on
+                        deployed pathology pipelines. The contribution is the methodological result about
+                        probe-based capability claims, and the erasure is the instrument that demonstrates it.
+                        <strong>Caveat: this is BRACS only.</strong> PANDA and TCGA-LUNG runs are still queued, and
+                        the resistance ratio may differ where the pooled attack is weaker.
+                    </div>
                 </div>
             </div>
             <div class="matrix-container" style="margin-top: 0;">
