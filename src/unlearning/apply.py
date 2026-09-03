@@ -35,11 +35,13 @@ import torch
 
 from .low_rank import LowRankEraser
 from .noise import apply_dropout, apply_gaussian_noise
-from .subspace import remove_subspace, remove_subspace_affine
+from .subspace import orthonormalize, remove_subspace, remove_subspace_affine
 
 AFFINE_METHODS = ('leace', 'splince')
 STOCHASTIC_METHODS = ('gaussian', 'dropout')
-METHODS = ('none', 'svd', 'low_rank') + AFFINE_METHODS + STOCHASTIC_METHODS
+# svd_dev and svd_bag target ATTENTION rather than mean pooling. See build_eraser.
+BAG_METHODS = ('svd_dev', 'svd_bag')
+METHODS = ('none', 'svd', 'low_rank') + AFFINE_METHODS + STOCHASTIC_METHODS + BAG_METHODS
 
 
 def save_affine(path, P, mu, validate=True):
@@ -145,5 +147,44 @@ def build_eraser(method, path=None, device='cpu', input_dim=None, k=None,
                 )
             return (lambda X: remove_subspace(X, U)), U
         return (lambda X: remove_subspace_affine(X, U, mu)), {'U': U, 'mu': mu}
+
+    if method in BAG_METHODS:
+        # WHY THESE EXIST
+        # Plain svd removes a fixed subspace from every patch. Mean pooling sees
+        # only the slide mean, which loses exactly that subspace, so MeanMIL
+        # collapses. Attention SELECTS patches instead of averaging them, so it
+        # can still read signal carried in the within-slide deviations
+        # z_j - mean(z). Measured on BRACS: MeanMIL drops 0.339, ABMIL 0.056,
+        # TransMIL 0.020. Plain svd never touches the deviations.
+        if not (isinstance(weights, dict) and 'U' in weights):
+            raise ValueError(f"{method} eraser at {path} needs a dict with key 'U'")
+        U = weights['U'].to(device)
+        mu = weights['mu'].to(device)
+
+        if method == 'svd_dev':
+            # Remove the mean subspace AND a subspace fitted on the within-slide
+            # deviations, i.e. the part of the bag attention actually reads.
+            # Still ONE fixed linear projector applied identically to every
+            # patch, so it stays comparable with plain svd and cannot be
+            # dismissed as an adaptive or bag-dependent transform.
+            Ud = weights.get('U_dev')
+            if Ud is not None:
+                U = orthonormalize(torch.cat([U, Ud.to(device)], dim=1))
+            return (lambda X: remove_subspace_affine(X, U, mu)), weights
+
+        # svd_bag: erase, then shrink what is left of the within-slide spread by
+        # alpha. alpha = 1 is plain svd; alpha = 0 makes every patch identical to
+        # the erased slide mean, at which point attention over identical patches
+        # IS mean pooling and no pooling rule can recover anything the mean lost.
+        # alpha therefore traces a strength/detectability curve rather than being
+        # a single setting.
+        alpha = float(weights.get('alpha', 0.0))
+
+        def _bag(X):
+            m = X.mean(dim=0, keepdim=True)
+            em = remove_subspace_affine(m, U, mu)
+            return em + alpha * remove_subspace_affine(X - m, U, torch.zeros_like(mu))
+
+        return _bag, weights
 
     raise ValueError(f"Unknown unlearn method '{method}'. Expected one of {METHODS}.")
