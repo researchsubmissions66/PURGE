@@ -1,4 +1,4 @@
-# AGENTS.md — PURGE
+# AGENTS.md: PURGE
 
 Context for anyone (human or agent) picking up this repo. Written after a full
 validation pass. Read the traps section before running anything.
@@ -9,7 +9,7 @@ validation pass. Read the traps section before running anything.
 
 A **targeted adversarial attack on representations**: delete one downstream
 clinical task from frozen pathology foundation-model embeddings while leaving
-unrelated tasks intact. Not organ removal — the goal is task-specific erasure for
+unrelated tasks intact. Not organ removal: the goal is task-specific erasure for
 a specific organ.
 
 Data is pre-extracted patch features in HDF5 (`/work/hdd/bhwm/...`), d=2560 for
@@ -19,18 +19,17 @@ Data is pre-extracted patch features in HDF5 (`/work/hdd/bhwm/...`), d=2560 for
 
 ## The one rule
 
-**An eraser must be non-invertible.** An invertible map — including the residual
-adapter `z' = z + αBAz` — is an information-preserving bijection. It fools the
+**An eraser must be non-invertible.** An invertible map: including the residual
+adapter `z' = z + αBAz`: is an information-preserving bijection. It fools the
 fixed probe it was trained against; a *retrained* probe recovers the concept
 exactly.
 
 This is not theoretical. The original pipeline used exactly that adapter and
-reported erasure that did not exist: measured `σ_min = 2.27e-02`, `rank 2560/2560`
-— zero dimensions annihilated, and the eval AUC confirmed it (BACH→BACH 0.9884).
+reported erasure that did not exist. Measured `σ_min = 2.27e-02` at `rank 2560/2560`, so zero dimensions were annihilated, and the eval AUC confirmed it (BACH→BACH 0.9884).
 
 Guardrails now in place:
 
-* `src/unlearning/audit.py` — `audit_eraser()` reports rank / invertibility.
+* `src/unlearning/audit.py`: `audit_eraser()` reports rank / invertibility.
 * `scripts/train_adversarial.py` refuses to launch an invertible eraser without
   `--allow_invertible`.
 * `tests/test_erasers.py::test_low_rank_adapter_is_invertible` pins the negative
@@ -42,12 +41,12 @@ same eraser. Only from-scratch retrained probes count.
 
 ---
 
-## AUTHORITATIVE RESULTS — full 5-fold sweep (2026-09-02)
+## AUTHORITATIVE RESULTS: full 5-fold sweep (2026-09-02)
 
 `results/sweep_full/`, 276 configs, **every axis crossed with all 5 folds**.
 Reproduce with `python scripts/analyze_sweep.py --out_dir results/sweep_full`.
 Where a number below disagrees with one further down this file, **this section
-wins** — the older ones are fold-0 singletons or predate the analyzer fix in
+wins**: the older ones are fold-0 singletons or predate the analyzer fix in
 trap 17.
 
 Base settings: virchow2, affine SVD, k=64, max_slides=2000, mlp probe, chance 0.50.
@@ -102,7 +101,7 @@ the cohort's feature geometry, not of the concept.
 Nothing happens below ~100 slides. Most of the effect by 500-1000. Beyond that
 the cohorts run out (BRACS caps at 445 usable, lung at 834).
 
-### Probe ladder — accessibility, not content (5 folds, 7 families)
+### Probe ladder: accessibility, not content (5 folds, 7 families)
 
 | probe | BRACS | PANDA | TCGA-LUNG |
 |---|---|---|---|
@@ -122,7 +121,7 @@ A bigger readout recovers more on every target.
 * **Seed** changes nothing (0.5834 vs 0.5834). The variance is fold, not seed.
 * **Confound ladder**, n=1519: cross-organ +0.0052, same-organ +0.0138,
   same-slides +0.0486.
-* **`n_train` correlates +0.798 (p<1e-4) with erased AUC** — bigger cohorts are
+* **`n_train` correlates +0.798 (p<1e-4) with erased AUC**: bigger cohorts are
   harder to erase. Same fact as the budget curve, seen from the other side.
 
 ---
@@ -147,7 +146,7 @@ z' = (z - mu) - ((z - mu) @ U) @ U.T + mu
 | TCGA-LUNG (LUAD/LUSC) | 0.9363 | 0.4661 | 64 | −0.011 |
 | TCGA-BRCA (IDC/ILC) | 0.9089 | 0.5400 | 256 | −0.004 |
 
-\* effectively clamped — see traps.
+\* effectively clamped: see traps.
 
 ### Task-level, same slides (the unconfounded result)
 
@@ -165,15 +164,15 @@ separate cleanly. This is the most interesting scientific finding in the repo.
 
 ---
 
-## Sanity checks — all passed
+## Sanity checks: all passed
 
 `scripts/sanity_check_erasure.py`. Each is built to fail if the result is an
 artifact.
 
 | Check | Result |
 |---|---|
-| Random subspace, same rank | 0.9404 vs baseline 0.9363 — **no effect** |
-| Wrong cohort's subspace | 0.9341 vs 0.9363 — **no effect** |
+| Random subspace, same rank | 0.9404 vs baseline 0.9363: **no effect** |
+| Wrong cohort's subspace | 0.9341 vs 0.9363: **no effect** |
 | Permutation null | erased AUC inside the chance CI on all 3 targets |
 | High-capacity probe (1024-512) | 0.6218 / 0.5483 / 0.2569 vs baselines 0.93 / 0.98 / 0.92 |
 | Class separation along erased dirs | 2.96 → 3.7e-06 |
@@ -198,12 +197,12 @@ gone so they cannot be picked up by accident. Removed: `relevance.py`,
 Still present, deliberately: `low_rank.py` (the invertible negative control, whose
 test pins the original bug) and `spectral.py` (lambda=0 IS affine SVD).
 
-### 1. Adversarial learned eraser — abandoned
+### 1. Adversarial learned eraser: abandoned
 
 `scripts/train_adversarial.py` with `ProjectionEraser`. The min-max does not
 converge; in-loop probe accuracy climbs to 0.988 while the adversarial loss rises.
 
-Initializing from the SVD subspace does not save it — **it starts on the answer
+Initializing from the SVD subspace does not save it: **it starts on the answer
 and walks away**:
 
 | Target | svd_k64 drop | projection_svdinit_r64 drop |
@@ -214,7 +213,7 @@ and walks away**:
 
 Code is kept and working; the approach is not recommended.
 
-### 2. Relevance-weighted direction selection — a trade-off knob, not an upgrade
+### 2. Relevance-weighted direction selection, a trade-off knob, not an upgrade
 
 `src/unlearning/relevance.py`. Ranks directions by target relevance per unit of
 (control damage + variance removed). 2×2 ablation, PANDA grade/detect, MLP:
@@ -226,8 +225,8 @@ Code is kept and working; the approach is not recommended.
 | relevance λc=0 **λd=1** | 0.8579 | 0.9050 |
 | relevance **λc=1** λd=0 | 0.6465 | **0.8474** |
 
-* `λ_c` **works** — +9.4 points of control preservation, mechanism confirmed.
-* `λ_d` is **fatal** — erasure goes to zero. The target signal lives in the
+* `λ_c` **works**: +9.4 points of control preservation, mechanism confirmed.
+* `λ_d` is **fatal**: erasure goes to zero. The target signal lives in the
   high-variance directions, so penalising them removes the attack. **Default is
   now 0.**
 * Neither rescues the core deficit: ranking directions *individually* erases less
@@ -239,7 +238,7 @@ Swapping Fisher for HSIC (`--relevance_criterion hsic`) does **not** help
 
 Keep it as an ablation row: it answers "why not pick directions more cleverly?"
 
-### 3. Reconstruction head (distortion masking) — failed, but informative
+### 3. Reconstruction head (distortion masking): failed, but informative
 
 `src/unlearning/reconstruct.py`. `z' = mu + h + U g(h)` with `g` predicting the
 erased coefficients from the preserved part `h` alone. Provably cannot leak (DPI),
@@ -263,22 +262,22 @@ Two lessons:
 Always fit the head on train and evaluate held-out: in-sample it reaches 100% of
 erased-coefficient variance and effectively undoes the projection.
 
-### 4. Iterative INLP — failed
+### 4. Iterative INLP: failed
 
 `src/unlearning/iterative.py`. Remove the directions a probe uses, refit, repeat.
 At equal rank 64: TCGA-LUNG 0.7837 vs SVD's 0.4661; PANDA 0.8181 vs 0.4832.
 
-### 5. SVD refinements — one win, two neutral/negative
+### 5. SVD refinements: one win, two neutral/negative
 
 `src/unlearning/svd_plus.py`.
 
 | refinement | axis | verdict |
 |---|---|---|
-| affine (mean-preserving) | how removal is applied | **WIN — now the default** |
+| affine (mean-preserving) | how removal is applied | **WIN: now the default** |
 | spectral pencil (lambda) | control-aware variance | best collateral knob; costs erasure |
 | bootstrap stabilisation | estimation noise | neutral (0.4661 -> 0.5056 mlp) |
-| automatic k (parallel analysis) | the k knob | **worse** — picks k=19-35, erasure drops to 0.6341 |
-| background whitening | the metric | **failed** — no erasure at all (0.9309) |
+| automatic k (parallel analysis) | the k knob | **worse**: picks k=19-35, erasure drops to 0.6341 |
+| background whitening | the metric | **failed**: no erasure at all (0.9309) |
 
 * **Whitening fails for an n<<d reason**: the background covariance is rank
   deficient, so its inverse blows up along the null space and the top generalised
@@ -293,7 +292,7 @@ At equal rank 64: TCGA-LUNG 0.7837 vs SVD's 0.4661; PANDA 0.8181 vs 0.4832.
   relative to d, pure noise directions are highly stable (returned k=11 for 5
   planted directions).
 
-### 6. Spectral pencil — the cleanest knob, still not a free lunch
+### 6. Spectral pencil: the cleanest knob, still not a free lunch
 
 `src/unlearning/spectral.py`. Writes affine SVD as the trace objective it already
 solves, then prices the controls into it:
@@ -323,7 +322,7 @@ PANDA-grade, MLP probe:
 * `spectral_erasure_loss()` is the differentiable form - the route to plan section 19
   (poison the encoder itself rather than bolting on a projection). Untested.
 
-### 7. Quadratic / optimal-transport erasure — fails structurally
+### 7. Quadratic / optimal-transport erasure: fails structurally
 
 `QuadraticEraser` (vendored, previously never run). Equalises class-conditional
 means AND covariances by transporting each class to the Wasserstein barycenter -
@@ -373,17 +372,17 @@ and maps each class to a shared barycenter, so it is NOT a fixed transform and i
 undefined off-cohort. It cannot be a released artefact; it only fits a
 dataset-poisoning framing where the attacker labels what they publish.
 
-### 8. LEACE — exact linearly, leaks nonlinearly
+### 8. LEACE: exact linearly, leaks nonlinearly
 
 Hits **exactly 0.5000** on a logistic probe every time (its guarantee, and it
 holds once the bias is applied correctly). Against an MLP: 0.6823 / **0.9638** /
-0.7299 / 0.8431 — for BACH it erases nothing. Correct statement is "linear
+0.7299 / 0.8431: for BACH it erases nothing. Correct statement is "linear
 erasure does exactly what it promises and nothing more," not "linear erasure
 fails."
 
 ---
 
-### 9. Nonlinear bottleneck + HSIC — fails, and generalises the mechanism
+### 9. Nonlinear bottleneck + HSIC: fails, and generalises the mechanism
 
 `src/unlearning/bottleneck.py`. `z' = dec(enc(z))`, m < d, trained on fidelity
 (target + all controls) plus `lambda_t * HSIC(enc(z), y_target)`. Chosen because it
@@ -500,7 +499,7 @@ clean = 0.9540:
 
 | eraser | erased AUC | drop |
 |---|---|---|
-| patch-fit, 300 slides — **the one behind the ABMIL claim below** | 0.7975 | 0.157 |
+| patch-fit, 300 slides: **the one behind the ABMIL claim below** | 0.7975 | 0.157 |
 | patch-fit, 1000 slides (refit) | 0.9172 | 0.037 |
 | **slide-mean fit on the fold's train split (pooled protocol)** | **0.5355** | **0.419** |
 
@@ -515,7 +514,7 @@ Two consequences:
    and presenting them side by side overstates how much of the real attack ABMIL
    survives. It must be re-measured with a slide-mean eraser.
 
-2. **Fitting the patch eraser BETTER makes it WEAKER** — 1000 slides (0.9172) is
+2. **Fitting the patch eraser BETTER makes it WEAKER**: 1000 slides (0.9172) is
    worse than 300 (0.7975). A larger patch sample estimates the patch covariance
    more faithfully, and patch covariance is dominated by within-slide texture,
    stain and position, which is not where slide-level label signal lives. Same
@@ -528,8 +527,8 @@ defect is WHICH subspace, not whether it is removed.
 
 Fix: fit the MIL eraser on the target task's training-split SLIDE MEANS, per
 fold, and apply it at patch level. Erasure and mean pooling are both linear and
-commute, so MeanMIL then reproduces the pooled number exactly — which gives the
-MIL sweep a checkable anchor it never had — and ABMIL/TransMIL measure genuine
+commute, so MeanMIL then reproduces the pooled number exactly, which gives the
+MIL sweep a checkable anchor it never had, and ABMIL/TransMIL measure genuine
 architectural resistance to the same attack the rest of the paper reports.
 
 Patch-fitted MIL results are quarantined in `results/_patchfit_mil/`.
@@ -788,7 +787,7 @@ class signal against per-image noise; aim for a baseline of 0.80-0.95.
 
 4. **Audit must probe in float64.** An affine eraser computes `(z−μ)…+μ`; in
    float32 that cancellation costs ~1e-4 precision and swamps the rank threshold.
-   Do **not** fix this by loosening the threshold — an invertible low-rank adapter
+   Do **not** fix this by loosening the threshold, an invertible low-rank adapter
    has condition number ~3e4 and a loose cutoff would call it rank-deficient,
    defeating the audit.
 
@@ -799,7 +798,7 @@ class signal against per-image noise; aim for a baseline of 0.80-0.95.
    `1/num_classes`.
 
 7. **Undefined AUC must never return 0.5.** A placeholder is indistinguishable
-   from a genuine chance result — the exact quantity this project measures.
+   from a genuine chance result: the exact quantity this project measures.
    `macro_ovr_auc` returns `None` plus a reason.
 
 8. **`torch.linalg.lstsq` defaults to the `gels` driver, which assumes full
@@ -848,20 +847,19 @@ class signal against per-image noise; aim for a baseline of 0.80-0.95.
     TCGA slides against everyone else's ~2169. Check FILE COUNTS, not directory
     existence - an empty directory passes an `isdir` test and then fails at load.
 
-16. **BRACS-atypia is underpowered** — 167 cached slides of 4,539 available, ~133
+16. **BRACS-atypia is underpowered**: 167 cached slides of 4,539 available, ~133
    training. Every method is unstable there (0.90 → 0.20 → 0.47 across k). Prefer
    the PANDA pair (~470 training slides) for same-slides claims.
 
 17. **A filter helper that misses one axis silently corrupts every number that
    uses it.** `analyze_sweep.base_settings()` filtered `n_fit`, `max_slides`,
    `patches` and `seed` but not `fit_on` or `probe`. A cross-cohort run is
-   `method=svd, k=64, fold=0, n_fit=None, max_slides=2000` — it passes every
+   `method=svd, k=64, fold=0, n_fit=None, max_slides=2000`, it passes every
    remaining filter, and its erased AUC is high *by construction* (transfer
    fails), so all four of them were being averaged into the base means. The
    7-probe-family run leaked five extra probes the same way. Effect: headline
    erased AUCs read 0.5778 / 0.7932 / 0.6660 when the correct values are
-   **0.5451 / 0.7772 / 0.6156** — the attack was reported as *weaker* than it is
-   — and the `spectral(lam=0) == svd` check read 0.4312 vs 0.5254 and was
+   **0.5451 / 0.7772 / 0.6156**: the attack was reported as *weaker* than it is, and the `spectral(lam=0) == svd` check read 0.4312 vs 0.5254 and was
    recorded for a day as an unexplained method failure. It was not: the two
    subspaces agree to `min singular value 1.000000` on real features at k=16,
    64 and 256, and once the filter is fixed the check passes on all three
@@ -898,7 +896,7 @@ class signal against per-image noise; aim for a baseline of 0.80-0.95.
    patch. On Lustre that ran at ~1 slide/s and killed two consecutive 55-minute
    eraser fits before a single one finished. Reading evenly spaced CONTIGUOUS
    slabs instead gives 0.62 s/slide for TCGA and 0.42 s/slide for the mixed
-   negative set — a 1000-slide fit drops from >55 min to ~17 min — and keeps the
+   negative set, a 1000-slide fit drops from >55 min to ~17 min, and keeps the
    sample spread across the slide. `quick_validate.slab_starts()` had already
    solved this; `fit_unlearner.py` had not, and the two were not sharing code.
 
@@ -915,7 +913,7 @@ class signal against per-image noise; aim for a baseline of 0.80-0.95.
   split carved from training patients. No max-over-epochs on the reported split.
 * Probes retrained **from scratch** on the frozen eraser.
 * **Both** probe families. `low_rank` scored 0.7301 on MLP (looked like erasure)
-  while logreg recovered to 0.9369 — above baseline. One probe family is not
+  while logreg recovered to 0.9369: above baseline. One probe family is not
   evidence.
 * Report the high-capacity probe number alongside the standard one.
 
@@ -943,10 +941,10 @@ MIL pipeline.
 * Batch GPU queues are thousands deep (`gpuA100x4`: 1543 pending). The
   **interactive** partitions are near-empty and schedule in seconds, capped at
   1 hour and **2 concurrent/submitted jobs per user** (`QOSMaxSubmitJobPerUserLimit`).
-* Login node has a **30-minute CPU limit** — do not load features there.
+* Login node has a **30-minute CPU limit**: do not load features there.
 * `/work/hdd` is heavily contended. Features are chunked `(1, 2560)`, so random
   row sampling means one seek per patch. Use **strided slab reads** (8 contiguous
-  blocks of 32) — this was ~9× faster. Feature caches are in
+  blocks of 32), this was ~9× faster. Feature caches are in
   `results/quick/cache/` and make reruns instant.
 * Default partition is `gpuA40x4,gpuA100x4` (`scripts/common.sh`); override with
   `PURGE_SLURM_PARTITION`.
@@ -963,7 +961,7 @@ MIL pipeline.
 
 2. **The attack is not stealthy.** cos(z, z′) ≈ 0.86 after the affine fix (was
    0.43). Plan §23's "visually normal latent geometry" claim does not hold at that
-   level — either weaken it or find distortion-aware selection that does not kill
+   level: either weaken it or find distortion-aware selection that does not kill
    erasure (`λ_d` does not).
 
 4. **Nested tasks.** Can grading be separated from detection at all, or is the
@@ -976,10 +974,10 @@ MIL pipeline.
 
 ## Repo state
 
-* `results/_invalid_pre_fix/` — quarantined pre-fix results. Invalid (invertible
+* `results/_invalid_pre_fix/`: quarantined pre-fix results. Invalid (invertible
   eraser, wrong LEACE bias, selection on the eval split). Do not cite or
   aggregate. Kept for auditability.
 * Patient arrays are now **sorted** before `KFold` for reproducibility. This
-  changed fold membership — nothing from the quarantined runs is comparable to
+  changed fold membership: nothing from the quarantined runs is comparable to
   current numbers, including baselines.
 * All current results: `results/quick/*.json`.

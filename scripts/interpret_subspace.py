@@ -30,6 +30,13 @@ import sys
 import numpy as np
 import torch
 
+# umap-learn is a --user install, and the pytorch-conda module sets
+# site.ENABLE_USER_SITE = False, so the user site directory is not on sys.path.
+# Add it explicitly rather than silently skipping the figures.
+_USER_SITE = os.path.expanduser('~/.local/lib/python3.11/site-packages')
+if os.path.isdir(_USER_SITE) and _USER_SITE not in sys.path:
+    sys.path.append(_USER_SITE)
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from src.unlearning.subspace import remove_subspace_affine, svd_subspace  # noqa: E402
 
