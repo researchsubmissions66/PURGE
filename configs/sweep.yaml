@@ -129,7 +129,9 @@ crosses:
     fold: *id001
   rank_x_encoder:
     k:
+    - 16
     - 64
+    - 128
     - 256
     - 512
     fm:
@@ -161,3 +163,64 @@ crosses:
     - 256
     - 512
     fold: *id002
+  random_control:
+    method:
+    - random
+    k:
+    - 8
+    - 16
+    - 32
+    - 64
+    - 128
+    - 256
+    - 512
+    fold: &id003
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+  probe_x_random:
+    method:
+    - random
+    probes:
+    - - logreg
+      - linsvm
+      - rbfsvm
+      - knn
+      - rf
+      - mlp
+      - mlp_big
+    k:
+    - 64
+    - 256
+    - 512
+    fold: *id003
+  cross_cohort_x_encoder:
+    fit_on:
+    - BRACS-atypia
+    - UBC-OCEAN-subtype
+    - BACH-histology
+    - PANDA-grade
+    - TCGA-LUNG-subtype
+    fm: &id004
+    - features_virchow2
+    - features_hoptimus0
+    - features_uni_v2
+    - features_gigapath
+    - features_gpfm
+    - features_conch_v15
+    - features_ctranspath
+    - features_virchow
+    fold: *id003
+  budget_x_encoder:
+    n_fit:
+    - 100
+    - 500
+    - 1000
+    fm: *id004
+    fold: *id003
+  budget_matched_transfer:
+    n_fit:
+    - 400
+    fold: *id003

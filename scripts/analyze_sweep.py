@@ -303,6 +303,68 @@ def main():
         print("\n-- collateral --")
         print(cl.round(4).to_string())
 
+    # -- 9b. R1: random-subspace control ----------------------------------- #
+    hdr("9b. RANDOM-SUBSPACE CONTROL  (does targeting the top-k directions matter?)")
+    rc = P[P.method.isin(['svd', 'random'])]
+    rc = rc[rc.n_fit.isna() & (rc.max_slides == 2000) & (rc.seed == 0)
+            & (rc.fit_on.isna() | (rc.fit_on == rc.target))]
+    rc = rc[rc.probe.isin(BASE_PROBES)]
+    if not rc.empty and 'random' in set(rc.method):
+        piv = rc.pivot_table(index='k', columns=['target', 'method'], values='erased',
+                             aggfunc='mean')
+        print(piv.round(4).to_string())
+        print("\nRemoving k RANDOM orthogonal directions deletes the same number of")
+        print("dimensions without targeting cohort variance. If the two columns match,")
+        print("the top-k selection is doing nothing and the result is about rank alone.")
+        for tgt in sorted(set(rc.target)):
+            d2 = rc[rc.target == tgt]
+            for k in sorted(set(d2.k)):
+                a = d2[(d2.k == k) & (d2.method == 'svd')].erased.mean()
+                b = d2[(d2.k == k) & (d2.method == 'random')].erased.mean()
+                if not (np.isnan(a) or np.isnan(b)):
+                    print(f"  {tgt:20s} k={k:4d}  svd {a:.3f}  random {b:.3f}  "
+                          f"gap {b - a:+.3f}")
+    else:
+        print("  (no random-subspace runs yet)")
+
+    # -- 9c. R2: selectivity and destruction at the SAME operating point ---- #
+    hdr("9c. SELECTIVITY vs RANK  (do precision and destruction coexist?)")
+    sr = P[(P.method == 'svd') & P.n_fit.isna() & (P.max_slides == 2000)
+           & (P.seed == 0) & (P.fit_on.isna() | (P.fit_on == P.target))
+           & P.probe.isin(BASE_PROBES)]
+    if not sr.empty:
+        g = sr.groupby('k').agg(target_auc=('erased', 'mean'),
+                                baseline=('baseline', 'mean'),
+                                collateral=('collateral', 'mean'), n=('erased', 'size'))
+        g['target_drop'] = g.baseline - g.target_auc
+        g['selectivity'] = g.target_drop / g.collateral.abs().clip(lower=1e-4)
+        print(g.round(4).to_string())
+        print("\nQuoting collateral from low k and destruction from high k as one result")
+        print("overstates the method. This table is the honest operating curve.")
+
+    # -- 9d. R4: is a sub-chance AUC a finding or a small test set? --------- #
+    hdr("9d. STATISTICAL POWER  (why some cells fall below chance)")
+    pw = P[P.probe.isin(BASE_PROBES)].dropna(subset=['erased', 'n_test'])
+    if not pw.empty:
+        pw = pw.copy()
+        pw['se'] = np.sqrt(0.25 / (pw.n_test / 2))     # AUC SE at true chance
+        pw['spans_chance'] = (pw.erased - 0.5).abs() < 1.96 * pw.se
+        for tgt, sub in pw.groupby('target'):
+            below = (sub.erased < 0.45).sum()
+            print(f"  {tgt:20s} n_test {int(sub.n_test.min())}-{int(sub.n_test.max())} "
+                  f"(median {int(sub.n_test.median())})   typical SE {sub.se.median():.3f}"
+                  f"   cells <0.45: {below}")
+        lo = pw.nsmallest(1, 'erased')
+        if len(lo):
+            r = lo.iloc[0]
+            print(f"\n  lowest overall {r.erased:.3f} on {r.target} at n_test={int(r.n_test)}; "
+                  f"at true chance the 95% band there is "
+                  f"[{0.5 - 1.96 * r.se:.3f}, {0.5 + 1.96 * r.se:.3f}]")
+        print(f"  {int(pw.spans_chance.sum())} of {len(pw)} measurements are statistically "
+              f"indistinguishable from chance.")
+        print("  Sub-chance values are sampling noise on small test sets, not evidence of")
+        print("  'better than complete' erasure, and must not be reported as such.")
+
     # -- 10c. probe ladder ------------------------------------------------ #
     hdr("10c. PROBE LADDER  (does a stronger readout recover the erased signal?)")
     pf = S[S.axis == 'probe_family']   # S, not P: P is fixed to one probe

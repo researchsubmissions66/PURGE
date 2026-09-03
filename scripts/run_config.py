@@ -28,7 +28,7 @@ from src.evaluation.metrics import selective_degradation_score        # noqa: E4
 from src.evaluation.tasks import get_task, relation                   # noqa: E402
 from src.unlearning.noise import apply_dropout, apply_gaussian_noise  # noqa: E402
 from src.unlearning.spectral import spectral_subspace                 # noqa: E402
-from src.unlearning.subspace import (remove_subspace,                 # noqa: E402
+from src.unlearning.subspace import (orthonormalize, remove_subspace,      # noqa: E402
                                      remove_subspace_affine, svd_subspace)
 
 
@@ -84,6 +84,18 @@ def build_transform(cfg, Xtr, ytr, control_X, device, n_classes):
                 torch.tensor(X, device=device), U, mu).cpu().numpy()
         return lambda X: remove_subspace(
             torch.tensor(X, device=device), U).cpu().numpy()
+
+    if method == 'random':
+        # REVIEWER CONTROL. Removing k random orthogonal directions deletes the
+        # same NUMBER of dimensions as svd without targeting the cohort's
+        # variance. Without this arm, "the task lives in the top-k variance
+        # subspace" is unfalsifiable: at k=512 of d=2560 the svd arm deletes 20%
+        # of the space, and any 20% might do it.
+        g = torch.Generator().manual_seed(1000 + int(cfg.get('seed', 0)) + int(cfg['fold']))
+        U = orthonormalize(torch.randn(Xt.shape[1], k, generator=g)).to(device)
+        build_transform.effective_k = int(U.shape[1])
+        return lambda X: remove_subspace_affine(
+            torch.tensor(X, device=device), U, mu).cpu().numpy()
 
     if method == 'spectral':
         U = spectral_subspace(Xt, k, controls=[torch.tensor(C) for C in control_X],

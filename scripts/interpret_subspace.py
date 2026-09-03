@@ -44,6 +44,13 @@ ORGAN = {'BACH': 'BREAST', 'BRACS': 'BREAST', 'TCGA-BRCA': 'BREAST',
          'PANDA': 'PROSTATE', 'TCGA-LUNG': 'LUNG', 'UBC-OCEAN': 'OVARIAN'}
 
 
+def random_subspace(d, k, seed):
+    """Orthonormal k-frame drawn uniformly, for the overlap null distribution."""
+    g = torch.Generator().manual_seed(seed)
+    Q, _ = torch.linalg.qr(torch.randn(d, k, generator=g))
+    return Q[:, :k]
+
+
 def load(ds, fm, cache_dir, tag='nall'):
     p = f"{cache_dir}/{ds}_{fm}_p256_{tag}.npz"
     if not os.path.exists(p):
@@ -86,7 +93,17 @@ def main():
 
     # ---- A. principal angles between cohort-fitted subspaces --------------- #
     print("\n== A. subspace overlap between cohorts (mean principal cosine) ==")
-    U = {ds: svd_subspace(d['X'], k=a.k) for ds, d in cohorts.items()}
+    # Fit on a patient-disjoint TRAIN half only. Fitting on all slides and then
+    # scoring the same slides is in-sample and inflates everything downstream.
+    from src.utils.splits import patient_folds
+    tr_mask = {}
+    for ds, d in cohorts.items():
+        try:
+            train_p, _ = patient_folds(a.metadata, ds, 0)
+            tr_mask[ds] = torch.tensor(np.isin(d['pat'], train_p))
+        except Exception:
+            tr_mask[ds] = torch.ones(len(d['X']), dtype=torch.bool)
+    U = {ds: svd_subspace(d['X'][tr_mask[ds]], k=a.k) for ds, d in cohorts.items()}
     names = list(U)
     out['principal_angles'] = {}
     same_organ, cross_organ = [], []
@@ -100,12 +117,36 @@ def main():
                 out['principal_angles'][f"{i}|{j}"] = m
                 (same_organ if ORGAN[i] == ORGAN[j] else cross_organ).append(m)
         print(f"{i[:11]:12s}" + "".join(f"{v:10.3f}" for v in row))
+    out['overlap_same_organ'] = same_organ
+    out['overlap_cross_organ'] = cross_organ
     out['overlap_same_organ_mean'] = float(np.mean(same_organ)) if same_organ else None
     out['overlap_cross_organ_mean'] = float(np.mean(cross_organ)) if cross_organ else None
-    print(f"\n  same-organ  pairs: {out['overlap_same_organ_mean']}")
-    print(f"  cross-organ pairs: {out['overlap_cross_organ_mean']}")
-    print("  (1.0 = identical subspace. If these two are close, the subspace is"
-          "\n   cohort geometry, not a property of the organ or the concept.)")
+
+    # Null: two INDEPENDENT random k-frames in the same ambient dimension. Without
+    # this, neither 0.47 nor 0.55 can be called high or low.
+    dmb = next(iter(U.values())).shape[0]
+    null = [principal_angles(random_subspace(dmb, a.k, 900 + i),
+                             random_subspace(dmb, a.k, 5000 + i))[0] for i in range(30)]
+    out['overlap_null_mean'] = float(np.mean(null))
+    out['overlap_null_sd'] = float(np.std(null))
+
+    print(f"\n  same-organ  pairs : {out['overlap_same_organ_mean']:.3f}  "
+          f"(n={len(same_organ)//2} distinct pairs)")
+    print(f"  cross-organ pairs : {out['overlap_cross_organ_mean']:.3f}  "
+          f"(n={len(cross_organ)//2} distinct pairs)")
+    print(f"  RANDOM null       : {out['overlap_null_mean']:.3f} +/- {out['overlap_null_sd']:.3f}"
+          f"   (independent k-frames in R^{dmb})")
+    if same_organ and cross_organ:
+        try:
+            from scipy.stats import mannwhitneyu
+            u, pv = mannwhitneyu(same_organ[::2], cross_organ[::2], alternative='greater')
+            out['overlap_same_vs_cross_p'] = float(pv)
+            print(f"  same > cross?      p = {pv:.4f}  "
+                  f"({'significant' if pv < .05 else 'NOT significant'})")
+        except Exception as e:
+            print(f"  (test unavailable: {e})")
+    print("  Read: if same-organ sits near cross-organ and both sit far above the")
+    print("  random null, cohorts share generic structure but nothing organ-specific.")
 
     # ---- B. what do the removed coordinates predict? ---------------------- #
     from sklearn.linear_model import LogisticRegression
@@ -118,14 +159,18 @@ def main():
         classes = np.unique(y)
         if len(classes) < 2:
             continue
-        Uk = U[ds]
-        mu = X.mean(0)
+        Uk = U[ds]                      # already fitted on the train half only
+        mu = X[tr_mask[ds]].mean(0)
         Xc = X - mu
         removed = (Xc @ Uk)                      # k coordinates that get deleted
         kept = remove_subspace_affine(X, Uk, mu)  # everything that survives
         yb = (y == classes[-1]).astype(int) if len(classes) == 2 else None
-        tr, te = train_test_split(np.arange(len(X)), test_size=0.3,
-                                  random_state=a.seed, stratify=y)
+        # Score on the held-out half the subspace was NOT fitted on.
+        tr = np.where(tr_mask[ds].numpy())[0]
+        te = np.where(~tr_mask[ds].numpy())[0]
+        if len(te) < 30 or len(np.unique(y[te])) < 2:
+            tr, te = train_test_split(np.arange(len(X)), test_size=0.3,
+                                      random_state=a.seed, stratify=y)
 
         def score(A, target, binary):
             m = LogisticRegression(max_iter=3000).fit(A[tr], target[tr])
