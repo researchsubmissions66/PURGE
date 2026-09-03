@@ -493,6 +493,49 @@ lines agree - more directions do not help, a high-capacity probe recovers 0.62, 
 nonlinear features of the surviving subspace recover 0.73. The surviving signal is
 NOT in the principal span, so principal-span removal cannot reach it.
 
+## CORRECTION (2026-09-02): the MIL pipeline was attacking with a WEAK eraser
+
+Measured on TCGA-LUNG, real fold-0 patient split, logreg on slide means,
+clean = 0.9540:
+
+| eraser | erased AUC | drop |
+|---|---|---|
+| patch-fit, 300 slides — **the one behind the ABMIL claim below** | 0.7975 | 0.157 |
+| patch-fit, 1000 slides (refit) | 0.9172 | 0.037 |
+| **slide-mean fit on the fold's train split (pooled protocol)** | **0.5355** | **0.419** |
+
+Subspace overlap between a patch-fit U and a slide-mean-fit U is only 0.698 mean
+principal cosine. They are different subspaces, not noisy versions of one.
+
+Two consequences:
+
+1. **The ABMIL comparison below was run against roughly half the attack.** Both
+   models saw the identical transform, so the RATIO is still internally valid,
+   but the absolute drops are not comparable to anything in `results/sweep_full`,
+   and presenting them side by side overstates how much of the real attack ABMIL
+   survives. It must be re-measured with a slide-mean eraser.
+
+2. **Fitting the patch eraser BETTER makes it WEAKER** — 1000 slides (0.9172) is
+   worse than 300 (0.7975). A larger patch sample estimates the patch covariance
+   more faithfully, and patch covariance is dominated by within-slide texture,
+   stain and position, which is not where slide-level label signal lives. Same
+   direction as the sweep's `n_train` vs erased-AUC correlation of +0.798.
+   Patch-fitting is not an under-tuned attack, it is the wrong protocol.
+
+The projection itself is fine: residual sd inside the removed subspace is 6e-6
+across slides, i.e. collapsed to the constant `mu @ U` exactly as intended. The
+defect is WHICH subspace, not whether it is removed.
+
+Fix: fit the MIL eraser on the target task's training-split SLIDE MEANS, per
+fold, and apply it at patch level. Erasure and mean pooling are both linear and
+commute, so MeanMIL then reproduces the pooled number exactly — which gives the
+MIL sweep a checkable anchor it never had — and ABMIL/TransMIL measure genuine
+architectural resistance to the same attack the rest of the paper reports.
+
+Patch-fitted MIL results are quarantined in `results/_patchfit_mil/`.
+
+---
+
 ## THE POOLED PROXY IS A MEANMIL RESULT - ABMIL RESISTS 3x
 
 Identical eraser (LUNG k=64), identical slides, TCGA-LUNG, real patch bags,
