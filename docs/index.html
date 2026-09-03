@@ -11,6 +11,11 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- tsParticles (lightweight particles.js successor) -->
     <script src="https://cdn.jsdelivr.net/npm/tsparticles-slim@2.12.0/tsparticles.slim.bundle.min.js"></script>
+    <!-- KaTeX for the mathematical framework -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"
+            onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\(',right:'\\)',display:false}]});"></script>
 </head>
 
 <body>
@@ -24,6 +29,7 @@
             <div class="nav-links">
                 <a href="#finding">Central Finding</a>
                 <a href="#method">Method</a>
+                <a href="#math">Framework</a>
                 <a href="#results">Results</a>
                 <a href="#budget">Attack Cost</a>
                 <a href="#methods">Comparisons</a>
@@ -204,6 +210,383 @@
                 </div>
             </div>
         </div>
+    </section>
+
+    <!-- Mathematical framework -->
+    <section id="math" class="animate-up">
+        <h2 class="section-title">Mathematical Framework</h2>
+        <p class="section-desc">
+            The attack is a single rank-deficient affine map. Everything below follows from that,
+            including the constraints that limit it.
+        </p>
+
+        <div class="matrix-container">
+            <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                <i class="fas fa-square-root-alt" style="color: var(--primary); margin-right: 8px;"></i> Construction
+            </h3>
+            <div style="padding: 1.75rem; color: var(--gray); line-height: 1.75;">
+
+                <p><strong style="color:var(--dark);">Setup.</strong>
+                An encoder \(E\) maps a tissue patch to \(z \in \mathbb{R}^{d}\). For a cohort \(\mathcal{C}\)
+                with \(n\) slides, stack the slide-level representations as \(Z \in \mathbb{R}^{n \times d}\)
+                with mean \(\mu\) and covariance \(\Sigma\).</p>
+
+                <p style="margin-top:1.1rem;"><strong style="color:var(--dark);">Choice of subspace.</strong>
+                We take the \(k\) directions along which the target cohort varies most &mdash; the maximiser of a
+                trace objective over the Stiefel manifold:</p>
+                $$U^\star \;=\; \arg\max_{U^\top U = I_k} \operatorname{tr}\!\left(U^\top \Sigma\, U\right)
+                \;=\; \big[u_1,\dots,u_k\big],\qquad \Sigma u_i = \lambda_i u_i,\ \ \lambda_1 \ge \dots \ge \lambda_d$$
+
+                <p style="margin-top:1.1rem;"><strong style="color:var(--dark);">The eraser.</strong>
+                Project that subspace out while preserving the cohort mean, so the transform is affine rather
+                than merely linear:</p>
+                $$z' \;=\; P\,(z-\mu) + \mu \;=\; Pz + b,
+                \qquad P = I_d - UU^\top,\qquad b = \mu - P\mu = UU^\top\!\mu$$
+
+                <p style="margin-top:1.1rem;"><strong style="color:var(--dark);">What this does.</strong>
+                For every input, the coordinates along the erased subspace collapse to one constant:</p>
+                $$U^\top z' \;=\; U^\top\!\big(z - UU^\top z\big) + U^\top UU^\top\!\mu \;=\; U^\top\!\mu
+                \qquad\text{for all } z$$
+                <p>Those \(k\) coordinates have zero variance afterwards, so they carry no information about
+                anything. Note the residual is \(U^\top\!\mu\), <em>not</em> zero &mdash; a nonzero projection of
+                the erased features onto \(U\) is expected and is not evidence that the erasure failed.</p>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 2rem; margin-top: 2rem;">
+            <div class="matrix-container" style="margin-top: 0;">
+                <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                    <i class="fas fa-ban" style="color: var(--primary); margin-right: 8px;"></i> Why rank deficiency is required
+                </h3>
+                <div style="padding: 1.5rem; color: var(--gray); line-height: 1.7;">
+                    <p>\(\operatorname{rank}(P) = d-k < d\). This is not incidental. If a candidate eraser
+                    \(g\) were invertible, then for any label \(Y\),</p>
+                    $$I\big(g(Z);Y\big) = I(Z;Y)$$
+                    <p style="margin-top:.8rem;">and no information is removed, however convincingly the map
+                    defeats one fixed probe. An earlier version of this work used a residual adapter
+                    \(z' = z + \alpha BAz\), which is invertible for small \(\alpha\); it appeared to erase
+                    only because the probe was never retrained. Every eraser here is checked for rank
+                    deficiency before any result derived from it is reported, and an invertible adapter is
+                    carried as a negative control that must fail.</p>
+                </div>
+            </div>
+
+            <div class="matrix-container" style="margin-top: 0;">
+                <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                    <i class="fas fa-equals" style="color: var(--primary); margin-right: 8px;"></i> Commutation with mean pooling
+                </h3>
+                <div style="padding: 1.5rem; color: var(--gray); line-height: 1.7;">
+                    <p>For a bag of patches \(\{z_1,\dots,z_m\}\), erasing and averaging commute:</p>
+                    $$\frac{1}{m}\sum_{j} \big(Pz_j + b\big) \;=\; P\Big(\frac{1}{m}\sum_{j} z_j\Big) + b$$
+                    <p style="margin-top:.8rem;">So a probe on erased slide means is <em>exactly</em> mean-pooled
+                    MIL on erased patches. This makes the cheap slide-level sweep an exact proxy for one MIL
+                    architecture, and gives the MIL experiments a built-in correctness check. It also fails for
+                    attention pooling, whose weights are a nonlinear function of the patches and are re-learned
+                    after erasure &mdash; which is precisely why attention must be measured separately.</p>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 2rem; margin-top: 2rem;">
+            <div class="matrix-container" style="margin-top: 0;">
+                <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                    <i class="fas fa-compress-arrows-alt" style="color: var(--primary); margin-right: 8px;"></i> The budget bound
+                </h3>
+                <div style="padding: 1.5rem; color: var(--gray); line-height: 1.7;">
+                    <p>\(\Sigma\) estimated from \(n\) samples has rank at most \(n-1\), so the attacker cannot
+                    remove more directions than they have slides:</p>
+                    $$k_{\text{eff}} = \min\big(k,\ n-1,\ d\big)$$
+                    <p style="margin-top:.8rem;">Attack strength is therefore capped by the attacker's data.
+                    Since chance-level erasure requires \(k \approx 512\), it requires at least 513 slides from
+                    the target cohort &mdash; and in practice more, because estimates near the sample limit are
+                    noisy.</p>
+                </div>
+            </div>
+
+            <div class="matrix-container" style="margin-top: 0;">
+                <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                    <i class="fas fa-ruler-combined" style="color: var(--primary); margin-right: 8px;"></i> Comparing two cohorts' subspaces
+                </h3>
+                <div style="padding: 1.5rem; color: var(--gray); line-height: 1.7;">
+                    <p>Fit \(U_A\) on cohort \(A\) and \(U_B\) on cohort \(B\). Their principal angles are the
+                    singular values of the overlap matrix:</p>
+                    $$\cos\theta_i = \sigma_i\big(U_A^\top U_B\big), \qquad
+                    \overline{\cos\theta} = \tfrac{1}{k}\textstyle\sum_i \sigma_i$$
+                    <p style="margin-top:.8rem;">If the subspace encoded a clinical concept, two cohorts of the
+                    same organ would give \(\overline{\cos\theta}\approx 1\). The transfer results say otherwise,
+                    which is the central claim of this work stated geometrically.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="matrix-container" style="margin-top: 2rem;">
+            <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                <i class="fas fa-sliders-h" style="color: var(--primary); margin-right: 8px;"></i> A control-aware generalisation
+            </h3>
+            <div style="padding: 1.5rem; color: var(--gray); line-height: 1.7;">
+                <p>The objective above never sees the control tasks, which is where collateral damage comes from.
+                Pricing them in gives a one-parameter family whose optimum is the top-\(k\) eigenvectors of a
+                covariance pencil:</p>
+                $$\mathcal{L}_\lambda(U) = \operatorname{tr}\Big(U^\top\big(\Sigma_{t} - \lambda\,\overline{\Sigma}_{c}\big)U\Big),
+                \qquad \overline{\Sigma}_{c} = \tfrac{1}{|\mathcal{C}|}\textstyle\sum_{c}\Sigma_{c}$$
+                <p style="margin-top:.8rem;">A difference rather than a ratio: the Rayleigh form
+                \(u^\top\Sigma_t u / u^\top\Sigma_c u\) needs \(\Sigma_c^{-1}\), which explodes along the null
+                space when \(n \ll d\). Setting \(\lambda=0\) recovers plain projection exactly, and this is used
+                as a validation check &mdash; the two agree to four decimal places on all three targets.
+                Empirically <strong>\(\lambda>0\) strictly weakens the attack</strong> (BRACS 0.583 at
+                \(\lambda=0\) rising to 0.856 at \(\lambda=4\)): the directions carrying target signal are largely
+                the ones the controls also occupy, so subtracting control variance removes exactly what the attack
+                needs.</p>
+            </div>
+        </div>
+
+        <!-- Interactive figure 1: the geometry -->
+        <div class="matrix-container" style="margin-top: 2rem;">
+            <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                <i class="fas fa-drafting-compass" style="color: var(--primary); margin-right: 8px;"></i>
+                Interactive &mdash; why variance and discriminability are not the same direction
+            </h3>
+            <div style="padding: 1.5rem;">
+                <p style="color: var(--gray); margin-bottom: 1.25rem; line-height:1.7;">
+                    A schematic cohort in \(\mathbb{R}^2\) with two classes. Rotate the direction \(u\) to erase and
+                    watch what survives. The cloud's <em>highest-variance</em> direction is deliberately not the
+                    direction that separates the classes &mdash; the situation in real feature spaces. Removing the
+                    top-variance direction barely touches the classes; only removing the discriminative direction
+                    collapses them.
+                </p>
+                <div style="display:flex; flex-wrap:wrap; gap:1.5rem; align-items:flex-start;">
+                    <canvas id="geo-canvas" width="440" height="340"
+                            style="border:1px solid #e2e8f0; border-radius:8px; background:#fff; max-width:100%;"></canvas>
+                    <div style="flex:1; min-width:250px;">
+                        <label style="display:block; font-size:.9rem; color:var(--dark); font-weight:600; margin-bottom:.4rem;">
+                            Erased direction \(u\): <span id="geo-angle" style="color:var(--primary);">0&deg;</span>
+                        </label>
+                        <input id="geo-slider" type="range" min="0" max="179" value="0" style="width:100%;">
+                        <div style="display:flex; gap:.6rem; margin:.9rem 0 1.1rem;">
+                            <button class="btn btn-secondary geo-preset" data-a="0"
+                                    style="padding:.45rem .8rem; font-size:.82rem;">Top-variance direction</button>
+                            <button class="btn btn-secondary geo-preset" data-a="90"
+                                    style="padding:.45rem .8rem; font-size:.82rem;">Discriminative direction</button>
+                        </div>
+                        <table style="width:100%; margin:0; font-size:.92rem;">
+                            <tbody>
+                                <tr><td>Cohort variance removed</td><td style="text-align:right;"><strong id="geo-var">&mdash;</strong></td></tr>
+                                <tr><td>Class separation remaining (AUC)</td><td style="text-align:right;"><strong id="geo-auc">&mdash;</strong></td></tr>
+                            </tbody>
+                        </table>
+                        <div id="geo-note" style="margin-top:1rem; padding:.85rem 1rem; background: rgba(59,130,246,.1); border-left:4px solid var(--primary); border-radius:4px; font-size:.9rem; line-height:1.5; color:var(--gray);"></div>
+                    </div>
+                </div>
+                <p style="color: var(--gray); margin-top:1.25rem; font-size:.9rem; line-height:1.6;">
+                    <strong>Why the real attack still ranks by variance.</strong> This schematic is the argument for
+                    picking directions <em>discriminatively</em> &mdash; and we tried exactly that. Fisher ranking,
+                    HSIC, iterative INLP and adversarial selection all lost to plain variance ranking on real
+                    features, because task information there is spread across the cohort's principal span rather
+                    than concentrated in a few discriminative directions. The schematic shows why one would expect
+                    otherwise; the sweep shows the expectation is wrong at \(d=2560\).
+                </p>
+            </div>
+        </div>
+
+        <!-- Interactive figure 2: the measurements -->
+        <div class="matrix-container" style="margin-top: 2rem;">
+            <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                <i class="fas fa-chart-bar" style="color: var(--primary); margin-right: 8px;"></i>
+                Interactive &mdash; measured erasure by rank and by attacker budget
+            </h3>
+            <div style="padding: 1.5rem;">
+                <p style="color: var(--gray); margin-bottom: 1.1rem; line-height:1.7;">
+                    Every value below is a measured mean over 5 patient-grouped folds. The slider snaps to
+                    configurations that were actually run &mdash; nothing is interpolated.
+                </p>
+                <div style="display:flex; gap:.6rem; margin-bottom:1.1rem; flex-wrap:wrap;">
+                    <button class="btn btn-primary sw-mode" data-mode="rank" style="padding:.5rem .9rem; font-size:.85rem;">Subspace rank <em>k</em></button>
+                    <button class="btn btn-secondary sw-mode" data-mode="budget" style="padding:.5rem .9rem; font-size:.85rem;">Attacker budget <em>n</em></button>
+                </div>
+                <label style="display:block; font-size:.9rem; color:var(--dark); font-weight:600; margin-bottom:.4rem;">
+                    <span id="sw-label">Directions removed</span>: <span id="sw-value" style="color:var(--primary);">64</span>
+                    <span id="sw-effk" style="color:var(--gray); font-weight:400;"></span>
+                </label>
+                <input id="sw-slider" type="range" min="0" max="6" value="3" style="width:100%; margin-bottom:1.2rem;">
+                <svg id="sw-chart" viewBox="0 0 700 300" style="width:100%; height:auto;"></svg>
+                <div id="sw-note" style="margin-top:1rem; padding:1rem; background: rgba(59,130,246,.1); border-left:4px solid var(--primary); border-radius:4px; font-size:.93rem; line-height:1.55; color:var(--gray);"></div>
+            </div>
+        </div>
+
+<script>
+(function () {
+  // ---------- Figure 1: 2D geometry schematic ---------------------------- //
+  var cv = document.getElementById('geo-canvas');
+  if (!cv) return;
+  var ctx = cv.getContext('2d'), W = cv.width, H = cv.height, CX = W/2, CY = H/2, S = 46;
+
+  // Deterministic sample so the picture is stable across reloads.
+  var seed = 7;
+  function rnd() { seed = (seed*1103515245 + 12345) & 0x7fffffff; return seed/0x7fffffff; }
+  function gauss() { var u=1-rnd(), v=rnd(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+  // x = high-variance nuisance axis (sd 2.2); y = class axis (sd 0.55, means +/-0.75)
+  var pts = [];
+  for (var i=0;i<260;i++){
+    var cls = i%2;
+    pts.push({x: gauss()*2.2, y: gauss()*0.55 + (cls? 0.75 : -0.75), c: cls});
+  }
+  var totVar = pts.reduce(function(a,p){return a+p.x*p.x+p.y*p.y;},0)/pts.length;
+
+  function auc(vals, labs) {
+    var idx = vals.map(function(v,i){return i;}).sort(function(a,b){return vals[a]-vals[b];});
+    var r = [], i2 = 0;
+    while (i2 < idx.length) {          // average ranks over ties
+      var j = i2; while (j+1 < idx.length && vals[idx[j+1]] === vals[idx[i2]]) j++;
+      var avg = (i2+j)/2 + 1;
+      for (var t=i2;t<=j;t++) r[idx[t]] = avg;
+      i2 = j+1;
+    }
+    var n1=0,n0=0,s1=0;
+    for (var i3=0;i3<labs.length;i3++){ if(labs[i3]===1){n1++; s1+=r[i3];} else n0++; }
+    if(!n1||!n0) return 0.5;
+    var a = (s1 - n1*(n1+1)/2)/(n1*n0);
+    return Math.max(a, 1-a);           // orientation-free
+  }
+
+  function drawGeo(deg) {
+    var th = deg*Math.PI/180, ux = Math.cos(th), uy = Math.sin(th);
+    ctx.clearRect(0,0,W,H);
+    // axes
+    ctx.strokeStyle='#eef2f7'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(0,CY); ctx.lineTo(W,CY); ctx.moveTo(CX,0); ctx.lineTo(CX,H); ctx.stroke();
+
+    var proj = [], labs = [], removed = 0;
+    pts.forEach(function(p){
+      var d = p.x*ux + p.y*uy;               // coordinate along u
+      removed += d*d;
+      var rx = p.x - d*ux, ry = p.y - d*uy;  // surviving component
+      proj.push(rx*(-uy) + ry*ux); labs.push(p.c);
+      // original point, faint
+      ctx.fillStyle = p.c ? 'rgba(59,130,246,.20)' : 'rgba(220,38,38,.20)';
+      ctx.beginPath(); ctx.arc(CX+p.x*S, CY-p.y*S, 2.6, 0, 6.2832); ctx.fill();
+      // erased point, solid
+      ctx.fillStyle = p.c ? 'rgba(59,130,246,.95)' : 'rgba(220,38,38,.95)';
+      ctx.beginPath(); ctx.arc(CX+rx*S, CY-ry*S, 2.6, 0, 6.2832); ctx.fill();
+    });
+    removed /= pts.length;
+
+    // the erased direction
+    ctx.strokeStyle='#0f172a'; ctx.lineWidth=2; ctx.setLineDash([6,4]);
+    ctx.beginPath(); ctx.moveTo(CX-ux*W, CY+uy*W); ctx.lineTo(CX+ux*W, CY-uy*W); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='#0f172a'; ctx.font='12px sans-serif';
+    ctx.fillText('u  (erased)', CX+ux*90+6, CY-uy*90-6);
+
+    document.getElementById('geo-angle').textContent = deg + '°';
+    document.getElementById('geo-var').textContent = (100*removed/totVar).toFixed(1) + '%';
+    var a = auc(proj, labs);
+    document.getElementById('geo-auc').textContent = a.toFixed(3);
+    var note = document.getElementById('geo-note');
+    if (a > 0.85) {
+      note.innerHTML = '<strong>Classes intact.</strong> Plenty of variance can be deleted without touching '
+        + 'the signal &mdash; deleting variance is not the same as erasing a concept.';
+    } else if (a > 0.62) {
+      note.innerHTML = '<strong>Partially degraded.</strong> The erased direction overlaps the class axis, '
+        + 'but some separation survives in what remains.';
+    } else {
+      note.innerHTML = '<strong>Collapsed to chance.</strong> The erased direction is the discriminative one. '
+        + 'Note how little of the cohort’s variance this costs.';
+    }
+  }
+
+  var gs = document.getElementById('geo-slider');
+  gs.addEventListener('input', function(){ drawGeo(+gs.value); });
+  Array.prototype.forEach.call(document.querySelectorAll('.geo-preset'), function(b){
+    b.addEventListener('click', function(){ gs.value = b.dataset.a; drawGeo(+b.dataset.a); });
+  });
+  drawGeo(0);
+
+  // ---------- Figure 2: measured results --------------------------------- //
+  // All values are measured means over 5 folds. rank: virchow2. budget: k=64.
+  var DATA = {
+    rank: {
+      label: 'Directions removed', unit: 'k', pts: [8,16,32,64,128,256,512],
+      vals: {  8:[0.893,0.877,0.820], 16:[0.851,0.857,0.718],  32:[0.739,0.830,0.575],
+              64:[0.615,0.779,0.583], 128:[0.594,0.689,0.515], 256:[0.536,0.599,0.495],
+             512:[0.478,0.531,0.528] },
+      effk: null,
+      note: function (k, v) {
+        if (k <= 16) return 'Barely an attack. Too few directions to reach the signal.';
+        if (k <= 64) return 'Substantial degradation, but only breast atypia approaches chance.';
+        if (k <= 256) return 'Approaching chance on all three. Requires more than 256 fitting slides.';
+        return 'All three at chance. Needs at least 513 slides from the target cohort, since '
+             + 'k is bounded by n−1.';
+      }
+    },
+    budget: {
+      label: 'Slides available to the attacker', unit: 'n', pts: [25,50,100,250,500,1000,2000],
+      vals: { 25:[0.940,0.888,0.877],  50:[0.902,0.887,0.865], 100:[0.898,0.870,0.820],
+             250:[0.818,0.851,0.723], 500:[0.723,0.800,0.583],1000:[0.615,0.772,0.583],
+            2000:[0.615,0.779,0.583] },
+      effk: { 25:24, 50:49, 100:64, 250:64, 500:64, 1000:64, 2000:64 },
+      note: function (n) {
+        if (n <= 50) return 'No attack. The covariance rank bound clamps k to n−1, so the requested '
+                          + 'rank of 64 is unreachable.';
+        if (n <= 250) return 'The attack begins to bite, strongest on the smallest cohort.';
+        if (n <= 1000) return 'Most of the achievable effect at this rank.';
+        return 'Saturated — the cohorts themselves run out of training slides.';
+      }
+    }
+  };
+  var TASKS = ['TCGA-LUNG', 'PANDA', 'BRACS'];
+  var BASE  = [0.968, 0.911, 0.893];
+  var mode = 'rank';
+
+  function draw() {
+    var D = DATA[mode], slider = document.getElementById('sw-slider');
+    var key = D.pts[+slider.value], v = D.vals[key];
+    document.getElementById('sw-label').textContent = D.label;
+    document.getElementById('sw-value').textContent = key;
+    document.getElementById('sw-effk').textContent =
+      D.effk ? '  —  directions actually estimable: ' + D.effk[key] : '';
+    document.getElementById('sw-note').innerHTML = '<strong>Interpretation:</strong> ' + D.note(key, v);
+
+    var svg = '', W = 700, H = 300, L = 60, R = 20, T = 20, B = 55;
+    var y = function (a) { return T + (1 - (a - 0.4) / 0.6) * (H - T - B); };
+    // gridlines
+    [0.4,0.5,0.6,0.7,0.8,0.9,1.0].forEach(function (g) {
+      svg += '<line x1="'+L+'" y1="'+y(g)+'" x2="'+(W-R)+'" y2="'+y(g)+'" stroke="'+
+             (g===0.5?'#dc2626':'#eef2f7')+'" stroke-width="'+(g===0.5?2:1)+'"'+
+             (g===0.5?' stroke-dasharray="6 4"':'')+'/>';
+      svg += '<text x="'+(L-10)+'" y="'+(y(g)+4)+'" text-anchor="end" font-size="11" fill="#64748b">'+g.toFixed(1)+'</text>';
+    });
+    svg += '<text x="'+(W-R)+'" y="'+(y(0.5)-8)+'" text-anchor="end" font-size="11" fill="#dc2626">chance = 0.50</text>';
+    var bw = (W - L - R) / TASKS.length;
+    TASKS.forEach(function (t, i) {
+      var cx = L + bw*i + bw/2, w = bw*0.34;
+      // baseline ghost
+      svg += '<rect x="'+(cx-w-4)+'" y="'+y(BASE[i])+'" width="'+w+'" height="'+(y(0.4)-y(BASE[i]))+
+             '" fill="#cbd5e1" rx="3"/>';
+      svg += '<text x="'+(cx-w/2-4)+'" y="'+(y(BASE[i])-6)+'" text-anchor="middle" font-size="11" fill="#64748b">'+BASE[i].toFixed(3)+'</text>';
+      // erased
+      var col = v[i] <= 0.55 ? '#dc2626' : (v[i] <= 0.75 ? '#f59e0b' : '#3b82f6');
+      svg += '<rect x="'+(cx+4)+'" y="'+y(v[i])+'" width="'+w+'" height="'+(y(0.4)-y(v[i]))+
+             '" fill="'+col+'" rx="3"><title>'+t+': '+v[i].toFixed(3)+'</title></rect>';
+      svg += '<text x="'+(cx+w/2+4)+'" y="'+(y(v[i])-6)+'" text-anchor="middle" font-size="12" font-weight="600" fill="'+col+'">'+v[i].toFixed(3)+'</text>';
+      svg += '<text x="'+cx+'" y="'+(H-B+20)+'" text-anchor="middle" font-size="12" fill="#0f172a">'+t+'</text>';
+    });
+    svg += '<text x="'+(L+8)+'" y="'+(H-8)+'" font-size="11" fill="#94a3b8">grey = baseline, coloured = after erasure</text>';
+    document.getElementById('sw-chart').innerHTML = svg;
+  }
+
+  document.getElementById('sw-slider').addEventListener('input', draw);
+  Array.prototype.forEach.call(document.querySelectorAll('.sw-mode'), function (b) {
+    b.addEventListener('click', function () {
+      mode = b.dataset.mode;
+      Array.prototype.forEach.call(document.querySelectorAll('.sw-mode'), function (o) {
+        o.className = 'btn ' + (o === b ? 'btn-primary' : 'btn-secondary') + ' sw-mode';
+      });
+      draw();
+    });
+  });
+  draw();
+})();
+</script>
     </section>
 
     <!-- Rank -->
