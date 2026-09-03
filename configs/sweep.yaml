@@ -224,3 +224,21 @@ crosses:
     n_fit:
     - 400
     fold: *id003
+  encoder_allslides:
+    fm:
+    - features_virchow2
+    - features_hoptimus0
+    - features_uni_v2
+    - features_gigapath
+    - features_gpfm
+    - features_conch_v15
+    - features_ctranspath
+    - features_virchow
+    max_slides:
+    - null
+    fold:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4

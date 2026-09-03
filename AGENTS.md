@@ -41,6 +41,45 @@ same eraser. Only from-scratch retrained probes count.
 
 ---
 
+## THE RESULT THAT REFRAMES THE PROJECT (2026-09-03)
+
+Cohort-specificity is **not** a blanket property of linear probes. It is graded by
+how coarse the concept is. Measured with `scripts/concept_transfer_test.py`,
+BACH -> BRACS, both breast, virchow2, fold 0:
+
+| concept | within | transfer | refit | gap | probe cosine |
+|---|---|---|---|---|---|
+| Normal vs Invasive | 1.000 | **0.9997** | 0.999 | +0.000 | 0.488 |
+| Invasive vs InSitu | 1.000 | **0.9839** | 0.997 | +0.016 | 0.404 |
+| InSitu vs Benign | 0.996 | 0.8802 | 0.977 | +0.116 | 0.072 |
+| Benign vs Normal | 1.000 | 0.8328 | 0.874 | +0.167 | 0.038 |
+
+Perfectly monotone in both the transfer gap and the angle between the two
+cohorts' probe directions. Coarse morphology is genuinely encoded and portable.
+Fine distinctions are read off cohort-specific geometry: near-orthogonal
+directions (cosine 0.04) even though BOTH cohorts support the task on their own
+(refit 0.87).
+
+**Do not claim "probe results are cohort artifacts."** That is false for coarse
+concepts and the referees will find the counterexample immediately. The claim is:
+
+> A linear probe's within-cohort AUC does not tell you which regime you are in.
+> For coarse morphology the direction is portable; for fine distinctions it is
+> cohort geometry that happens to correlate with the label. Only a cross-cohort
+> transfer test separates the two.
+
+**This subsumes the erasure results rather than competing with them.**
+BRACS-atypia (ADH vs FEA) is the finest distinction in the benchmark. It is also
+the most completely erased target, the one with the largest fold variance, and
+the one whose eraser transfers worst. Same underlying fact, seen three ways.
+
+**And it supplies the mitigation the work previously lacked.** The transfer test
+needs no erasure machinery, runs in seconds on cached features, and turns the
+finding into something a practitioner can act on before publishing a capability
+claim. `scripts/concept_transfer_test.py`.
+
+---
+
 ## AUTHORITATIVE RESULTS: full 5-fold sweep (2026-09-02)
 
 `results/sweep_full/`, 276 configs, **every axis crossed with all 5 folds**.
