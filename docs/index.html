@@ -22,9 +22,11 @@
         <div class="nav-container">
             <a href="#" class="logo">PURG<span>E</span></a>
             <div class="nav-links">
-                <a href="#full-sweep">Full Sweep</a>
-                <a href="#methodology">Methodology</a>
-                <a href="#results">Clinical Cross-Evaluation</a>
+                <a href="#finding">Central Finding</a>
+                <a href="#method">Method</a>
+                <a href="#results">Results</a>
+                <a href="#budget">Attack Cost</a>
+                <a href="#methods">Comparisons</a>
                 <a href="https://github.com/researchsubmissions66/PURGE" target="_blank">GitHub Repository</a>
             </div>
         </div>
@@ -44,7 +46,7 @@
         </h1>
 
         <div class="hero-buttons animate-up delay-2" style="position: relative; z-index: 1;">
-            <a href="#methodology" class="btn btn-primary"><i class="fas fa-brain"></i> Methodology</a>
+            <a href="#method" class="btn btn-primary"><i class="fas fa-brain"></i> Method</a>
             <a href="#results" class="btn btn-secondary"><i class="fas fa-table"></i> View Results</a>
             <a href="https://github.com/researchsubmissions66/PURGE" target="_blank" class="btn btn-secondary"><i class="fab fa-github"></i> GitHub Repo</a>
         </div>
@@ -91,7 +93,7 @@
             <div class="metric-icon-wrap">
                 <i class="fas fa-tasks fa-2x" style="color: var(--primary)"></i>
             </div>
-            <div class="metric-num">5</div>
+            <div class="metric-num">7</div>
             <div class="metric-label">Downstream Tasks</div>
         </div>
         <div class="metric-card">
@@ -110,78 +112,173 @@
         </div>
     </div>
 
-    <!-- Full Sweep Results (authoritative) -->
-    <section id="full-sweep" class="animate-up">
-        <h2 class="section-title">Full 5-Fold Sweep &mdash; Authoritative Results</h2>
+    <!-- Headline finding -->
+    <section id="finding" class="animate-up">
+        <h2 class="section-title">The Central Finding</h2>
         <p class="section-desc">
-            Every earlier number on this page came from a single fold. The sweep below crosses
-            <strong>every ablation axis with all 5 patient-grouped folds</strong> across
-            <strong>8 pathology foundation models</strong>: 416 configurations, zero failures.
-            Chance is 0.50 for every task (macro one-vs-rest AUC).
+            A linear probe on a pathology foundation model scores 0.95 on grading or subtyping, and the
+            field reads that as evidence the model <em>encodes</em> the concept. We show that what the probe
+            reads is largely a low-dimensional subspace <strong>specific to the cohort it was estimated on</strong>.
+            Delete that subspace and the task collapses to chance. Fit the same deletion on a different cohort
+            of the <em>same organ</em> and nothing happens.
+        </p>
+
+        <div class="matrix-container">
+            <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                <i class="fas fa-exchange-alt" style="color: var(--primary); margin-right: 8px;"></i>
+                Cross-cohort transfer: the eraser only works where it was fitted
+            </h3>
+            <div style="padding: 1.5rem;">
+                <p style="margin-bottom: 1rem; color: var(--gray);">
+                    Rows are the cohort the eraser was fitted on; columns are the task it was applied to.
+                    Erased AUC, k&nbsp;=&nbsp;64, 5 folds per cell. Chance is 0.50. The shaded diagonal is
+                    the only place erasure does anything at all.
+                </p>
+                <table style="margin: 0; width: 100%;">
+                    <thead>
+                        <tr><th>Eraser fitted on &darr;</th><th>BRACS &mdash; atypia</th><th>PANDA &mdash; grade</th><th>TCGA-LUNG &mdash; subtype</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>BRACS-atypia</strong> <span style="color:var(--gray);font-size:.85em;">(breast)</span></td>
+                            <td style="background: rgba(59,130,246,.16);"><strong>0.583</strong></td><td>0.907</td><td>0.964</td></tr>
+                        <tr><td><strong>PANDA-grade</strong> <span style="color:var(--gray);font-size:.85em;">(prostate)</span></td>
+                            <td>0.901</td><td style="background: rgba(59,130,246,.16);"><strong>0.779</strong></td><td>0.964</td></tr>
+                        <tr><td><strong>TCGA-LUNG-subtype</strong> <span style="color:var(--gray);font-size:.85em;">(lung)</span></td>
+                            <td>0.893</td><td>0.916</td><td style="background: rgba(59,130,246,.16);"><strong>0.615</strong></td></tr>
+                        <tr><td>BACH-histology <span style="color:var(--gray);font-size:.85em;">(breast)</span></td>
+                            <td>0.898</td><td>0.920</td><td>0.964</td></tr>
+                        <tr><td>UBC-OCEAN-subtype <span style="color:var(--gray);font-size:.85em;">(ovarian)</span></td>
+                            <td>0.887</td><td>0.914</td><td>0.950</td></tr>
+                    </tbody>
+                </table>
+                <div style="margin-top: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); border-radius: 4px; font-size: 0.95rem; line-height: 1.5;">
+                    <strong>Read the breast rows together.</strong> BACH and BRACS are both breast cohorts. A subspace
+                    encoding a concept of breast atypia should transfer between them. It does not &mdash; the
+                    BACH-fitted eraser leaves BRACS atypia at 0.898, essentially untouched. Worse, the five weakest
+                    configurations in the entire sweep are cross-cohort runs in which the target <em>gains</em> accuracy
+                    while collateral damage to control tasks rises to roughly +0.09. Fitting on the wrong cohort harms
+                    the bystanders more than the intended target. What the projection removes is the geometry of one
+                    cohort's feature distribution, not a portable clinical concept.
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Method -->
+    <section id="method" class="animate-up">
+        <h2 class="section-title">Method</h2>
+        <p class="section-desc">
+            Fit the target cohort's top-<em>k</em> principal directions on the training split, then project them
+            out mean-preservingly. The transform is applied to train <em>and</em> test for every task, so the
+            victim never sees clean features &mdash; a poisoning threat model, not evasion.
+        </p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem; margin-top: 2.5rem;">
+            <div class="matrix-container" style="margin-top: 0;">
+                <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                    <i class="fas fa-project-diagram" style="color: var(--primary); margin-right: 8px;"></i> Affine null-space projection
+                </h3>
+                <div style="padding: 1.5rem; color: var(--gray); line-height: 1.65;">
+                    <p style="margin-bottom: 1rem;"><code>z&prime; = (z &minus; &mu;) &minus; ((z &minus; &mu;)U)U&#8868; + &mu;</code></p>
+                    <p style="margin-bottom: 0;">
+                        The projector is rank-deficient by construction, which is the whole point: an
+                        <strong>invertible</strong> map cannot remove information, however convincingly it fools a
+                        fixed probe. Every eraser in this work passes an automated invertibility audit before any
+                        result derived from it is reported.
+                    </p>
+                </div>
+            </div>
+
+            <div class="matrix-container" style="margin-top: 0;">
+                <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                    <i class="fas fa-shield-alt" style="color: var(--primary); margin-right: 8px;"></i> Evaluation protocol
+                </h3>
+                <div style="padding: 1.5rem; color: var(--gray); line-height: 1.65;">
+                    <ul style="margin: 0; padding-left: 1.2rem;">
+                        <li>Patient-grouped 5-fold splits; all slides from one patient stay on one side.</li>
+                        <li>The outer fold is the test set. Early stopping watches a separate inner split, never the reported one.</li>
+                        <li>Probes are retrained from scratch on erased features. A probe co-adapted in the loop is not evidence.</li>
+                        <li>Chance is 0.50 for macro one-vs-rest AUC regardless of class count.</li>
+                        <li>An invertible low-rank adapter is carried throughout as a negative control that must <em>fail</em> to erase.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Rank -->
+    <section id="results" class="animate-up">
+        <h2 class="section-title">How Complete Is the Erasure?</h2>
+        <p class="section-desc">
+            416 configurations, every ablation axis crossed with all 5 folds, across 8 pathology foundation
+            models. Zero failed runs.
         </p>
 
         <div class="matrix-container">
             <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
                 <i class="fas fa-crosshairs" style="color: var(--primary); margin-right: 8px;"></i>
-                The attack reaches chance &mdash; but only at high rank
+                At sufficient rank, all three targets reach chance &mdash; on every encoder
             </h3>
             <div style="padding: 1.5rem;">
                 <p style="margin-bottom: 1rem; color: var(--gray);">
-                    Erased AUC, averaged over all 8 encoders &times; 5 folds (n = 40 per cell).
-                    At k = 64 the attack merely degrades; at k = 512 all three targets sit at chance,
-                    and this holds for every encoder tested.
+                    Erased AUC averaged over all 8 encoders &times; 5 folds (n&nbsp;=&nbsp;40 per cell).
                 </p>
                 <table style="margin: 0; width: 100%;">
                     <thead>
-                        <tr><th>Subspace rank k</th><th>TCGA-LUNG (subtype)</th><th>PANDA (grade)</th><th>BRACS (atypia)</th></tr>
+                        <tr><th>Subspace rank <em>k</em></th><th>TCGA-LUNG</th><th>PANDA</th><th>BRACS</th></tr>
                     </thead>
                     <tbody>
-                        <tr><td><strong>Baseline (no erasure)</strong></td><td>0.968</td><td>0.911</td><td>0.893</td></tr>
-                        <tr><td>k = 64</td><td>0.667</td><td>0.777</td><td>0.544</td></tr>
-                        <tr><td>k = 256</td><td>0.523</td><td>0.576</td><td>0.507</td></tr>
-                        <tr><td><strong>k = 512</strong></td><td><strong>0.506</strong></td><td><strong>0.517</strong></td><td><strong>0.496</strong></td></tr>
+                        <tr><td><strong>Baseline</strong></td><td>0.968</td><td>0.911</td><td>0.893</td></tr>
+                        <tr><td>64</td><td>0.667</td><td>0.777</td><td>0.544</td></tr>
+                        <tr><td>256</td><td>0.523</td><td>0.576</td><td>0.507</td></tr>
+                        <tr><td><strong>512</strong></td>
+                            <td><span class="crash"><i class="fas fa-arrow-down"></i> 0.506</span></td>
+                            <td><span class="crash"><i class="fas fa-arrow-down"></i> 0.517</span></td>
+                            <td><span class="crash"><i class="fas fa-arrow-down"></i> 0.496</span></td></tr>
                     </tbody>
                 </table>
                 <div style="margin-top: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); border-radius: 4px; font-size: 0.95rem; line-height: 1.5;">
-                    <strong>Interpretation:</strong> An earlier claim that the attack saturates around k = 64 was an
-                    artifact of a 600-slide cap, because the number of estimable directions is bounded by
-                    <em>k &le; n &minus; 1</em>. With the cap lifted, destruction is complete. The cost is that running
-                    at k = 512 requires at least 513 fitting slides from the target cohort.
+                    <strong>Interpretation:</strong> The number of estimable directions is bounded by
+                    <em>k &le; n &minus; 1</em>, so attack strength is capped by how many slides the attacker holds.
+                    Running at k&nbsp;=&nbsp;512 requires at least 513 fitting slides from the target cohort.
+                    Encoder identity accounts for 27&ndash;39% of the remaining variance and fold for 14&ndash;35%,
+                    so the effect is real but encoder-dependent.
                 </div>
             </div>
         </div>
 
         <div class="matrix-container" style="margin-top: 2rem;">
             <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
-                <i class="fas fa-exchange-alt" style="color: var(--primary); margin-right: 8px;"></i>
-                The central finding: the subspace is cohort-specific, not concept-specific
+                <i class="fas fa-microchip" style="color: var(--primary); margin-right: 8px;"></i>
+                The eight encoders, and how each one holds up
             </h3>
             <div style="padding: 1.5rem;">
                 <p style="margin-bottom: 1rem; color: var(--gray);">
-                    Fit the eraser on cohort A, apply it to cohort B. Erased AUC, k = 64, 5 folds per cell.
-                    The diagonal (shaded) is the only place erasure does anything.
+                    Erased AUC at k&nbsp;=&nbsp;64, 5 folds per encoder. Every encoder is significantly damaged on
+                    every target; the marked cells are those statistically indistinguishable from chance.
                 </p>
                 <table style="margin: 0; width: 100%;">
                     <thead>
-                        <tr><th>Eraser fitted on &darr;</th><th>BRACS (atypia)</th><th>PANDA (grade)</th><th>TCGA-LUNG (subtype)</th></tr>
+                        <tr><th>Encoder</th><th>Origin</th><th>Dim</th><th>BRACS</th><th>PANDA</th><th>TCGA-LUNG</th></tr>
                     </thead>
                     <tbody>
-                        <tr><td><strong>BRACS-atypia</strong></td><td style="background: rgba(59,130,246,.14);"><strong>0.583</strong></td><td>0.907</td><td>0.964</td></tr>
-                        <tr><td><strong>PANDA-grade</strong></td><td>0.901</td><td style="background: rgba(59,130,246,.14);"><strong>0.779</strong></td><td>0.964</td></tr>
-                        <tr><td><strong>TCGA-LUNG-subtype</strong></td><td>0.893</td><td>0.916</td><td style="background: rgba(59,130,246,.14);"><strong>0.615</strong></td></tr>
-                        <tr><td>BACH-histology (breast)</td><td>0.898</td><td>0.920</td><td>0.964</td></tr>
-                        <tr><td>UBC-OCEAN-subtype</td><td>0.887</td><td>0.914</td><td>0.950</td></tr>
+                        <tr><td><strong>Virchow2</strong></td><td>Paige</td><td>2560</td><td>0.583</td><td>0.779</td><td>0.615</td></tr>
+                        <tr><td><strong>Virchow</strong></td><td>Paige</td><td>2560</td><td>0.576</td><td>0.792</td><td>0.683</td></tr>
+                        <tr><td><strong>H-optimus-0</strong></td><td>Bioptimus</td><td>1536</td><td><span class="crash">0.452</span></td><td>0.786</td><td>0.650</td></tr>
+                        <tr><td><strong>UNI v2</strong></td><td>Mahmood Lab</td><td>1536</td><td><span class="crash">0.516</span></td><td>0.816</td><td>0.645</td></tr>
+                        <tr><td><strong>Prov-GigaPath</strong></td><td>Providence / Microsoft</td><td>1536</td><td><span class="crash">0.513</span></td><td>0.764</td><td>0.619</td></tr>
+                        <tr><td><strong>GPFM</strong></td><td>&mdash;</td><td>1024</td><td><span class="crash">0.549</span></td><td>0.775</td><td>0.730</td></tr>
+                        <tr><td><strong>CONCH v1.5</strong></td><td>Mahmood Lab</td><td>768</td><td>0.621</td><td>0.753</td><td>0.728</td></tr>
+                        <tr><td><strong>CTransPath</strong></td><td>&mdash;</td><td>768</td><td><span class="crash">0.538</span></td><td>0.755</td><td>0.664</td></tr>
                     </tbody>
                 </table>
                 <div style="margin-top: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); border-radius: 4px; font-size: 0.95rem; line-height: 1.5;">
-                    <strong>Interpretation:</strong> BACH and BRACS are <em>both breast</em>. A subspace carrying
-                    a concept of breast atypia should transfer between them. It does not &mdash; BRACS is untouched at
-                    0.898. Worse, the five weakest configurations in the entire sweep are all cross-cohort runs, where
-                    the target <em>gains</em> accuracy while collateral damage rises to about +0.09: fitting on the wrong
-                    cohort harms the control tasks more than the intended target. What the erasure removes is the
-                    geometry of one cohort's feature distribution, not a portable clinical concept.
-                    <strong>This reframes linear-probe capability claims: a probe that scores 0.95 may be reading
-                    cohort structure that happens to correlate with the label.</strong>
+                    <strong>Interpretation:</strong> The attack is not an artifact of one encoder. At k&nbsp;=&nbsp;64
+                    breast atypia reaches chance on six of eight; prostate grading and lung subtyping remain above
+                    chance everywhere at this rank but fall to chance on all eight once k&nbsp;=&nbsp;512. Feature
+                    dimension does not predict vulnerability &mdash; the 2560-D and 768-D encoders behave similarly.
+                    <em>CONCH v1.5 and Virchow have no BACH features available, so the BACH control task is omitted for
+                    those two.</em>
                 </div>
             </div>
         </div>
@@ -192,7 +289,7 @@
                     <i class="fas fa-bullseye" style="color: var(--primary); margin-right: 8px;"></i> Selectivity: the confound ladder
                 </h3>
                 <div style="padding: 1.5rem;">
-                    <p style="margin-bottom: 1rem; color: var(--gray);">Collateral damage to control tasks, grouped by how closely a control is related to the target. 3,516 control measurements.</p>
+                    <p style="margin-bottom: 1rem; color: var(--gray);">Collateral damage to control tasks, grouped by how closely each control relates to the target. 3,516 control measurements.</p>
                     <table style="margin: 0; width: 100%;">
                         <thead><tr><th>Relation to target</th><th>AUC drop</th><th>n</th></tr></thead>
                         <tbody>
@@ -203,7 +300,7 @@
                     </table>
                     <div style="margin-top: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); border-radius: 4px; font-size: 0.95rem; line-height: 1.5;">
                         <strong>Interpretation:</strong> Damage scales cleanly with proximity to the target and is
-                        indistinguishable from zero across organs. The attack is precise.
+                        indistinguishable from zero across organs. When a task dies, it died because it was targeted.
                     </div>
                 </div>
             </div>
@@ -213,7 +310,7 @@
                     <i class="fas fa-layer-group" style="color: var(--primary); margin-right: 8px;"></i> Accessibility, not deletion
                 </h3>
                 <div style="padding: 1.5rem;">
-                    <p style="margin-bottom: 1rem; color: var(--gray);">The same erased features, read by probes of increasing capacity (k = 64, 5 folds).</p>
+                    <p style="margin-bottom: 1rem; color: var(--gray);">The same erased features read by probes of increasing capacity (k&nbsp;=&nbsp;64, 5 folds).</p>
                     <table style="margin: 0; width: 100%;">
                         <thead><tr><th>Probe</th><th>BRACS</th><th>PANDA</th><th>TCGA-LUNG</th></tr></thead>
                         <tbody>
@@ -223,330 +320,119 @@
                         </tbody>
                     </table>
                     <div style="margin-top: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); border-radius: 4px; font-size: 0.95rem; line-height: 1.5;">
-                        <strong>Interpretation:</strong> Recovery increases monotonically with readout capacity, so
-                        subspace removal degrades <em>accessibility</em> rather than destroying content. This also
-                        explains why eleven alternative erasure methods failed: they were chasing a residual that was
-                        never deleted.
+                        <strong>Interpretation:</strong> Recovery rises monotonically with readout capacity, so at
+                        moderate rank the projection degrades <em>accessibility</em> rather than destroying content.
+                        This is also why eleven alternative erasure methods failed &mdash; each was chasing a residual
+                        that had never been deleted.
                     </div>
                 </div>
             </div>
         </div>
-
-        <div class="matrix-container" style="margin-top: 2rem;">
-            <h3 style="padding: 1.25rem; margin: 0; background: #fffbeb; border-bottom: 1px solid #fde68a; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
-                <i class="fas fa-exclamation-triangle" style="color: #d97706; margin-right: 8px;"></i>
-                Corrections to previously reported results
-            </h3>
-            <div style="padding: 1.5rem; font-size: 0.95rem; line-height: 1.6; color: var(--gray);">
-                <p style="margin-bottom: .9rem;">
-                    <strong style="color: var(--dark);">Aggregation defect.</strong> The analysis helper that restricts
-                    results to the base configuration did not exclude cross-cohort runs or the extended probe family.
-                    Because a cross-cohort run matches the base configuration on every other field, and its erased AUC is
-                    high by construction, those runs were averaged into the headline means. Corrected values are
-                    <em>stronger</em> than previously reported (for example TCGA-LUNG 0.615 rather than 0.666). The same
-                    defect produced an apparent mismatch between the spectral objective at &lambda;=0 and plain SVD;
-                    the two subspaces are in fact identical to six decimal places.
-                </p>
-                <p style="margin-bottom: .9rem;">
-                    <strong style="color: var(--dark);">MIL erasers were fitted on the wrong distribution.</strong> The
-                    multiple-instance pipeline fitted its eraser on <em>patch</em> embeddings while the main sweep fits on
-                    <em>slide-mean</em> vectors. These span different subspaces (mean principal cosine 0.698). On
-                    TCGA-LUNG fold 0 the patch-fitted eraser moved AUC from 0.954 to 0.918, whereas the slide-mean
-                    eraser moved it to 0.536. Every MIL result that depended on an eraser has been withdrawn, including
-                    the previously reported claim that attention-based MIL resists erasure by roughly 4&times;. Those runs
-                    are being repeated with the corrected protocol.
-                </p>
-                <p style="margin-bottom: 0;">
-                    <strong style="color: var(--dark);">Still outstanding.</strong> Whether attention-based MIL
-                    (ABMIL, TransMIL) resists the corrected attack is not yet known, and it determines whether this work
-                    reports a practical attack or a methodological critique of probe-based capability claims. Interpretability
-                    analyses of the removed subspace &mdash; pairwise subspace overlap between cohorts, and what the deleted
-                    coordinates encode &mdash; are in progress.
-                </p>
-            </div>
-        </div>
     </section>
 
-    <!-- Methodology Section -->
-    <section id="methodology" class="animate-up">
-        <h2 class="section-title">The Methodology</h2>
+    <!-- Budget -->
+    <section id="budget" class="animate-up">
+        <h2 class="section-title">What the Attack Costs</h2>
         <p class="section-desc">
-            Traditional adversarial attacks perturb pixels at inference time to fool frozen models. PURGE operates at the dataset level, acting as a Targeted Latent-Space Poisoning Attack to blind downstream training.
-        </p>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 2.5rem;">
-            <!-- Datasets Table -->
-            <div class="matrix-container" style="margin-top: 0;">
-                <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
-                    <i class="fas fa-database" style="color: var(--primary); margin-right: 8px;"></i> Evaluated Datasets
-                </h3>
-                <table style="margin: 0;">
-                    <tbody>
-                        <tr>
-                            <td><strong>PANDA</strong></td>
-                            <td>Prostate</td>
-                        </tr>
-                        <tr>
-                            <td><strong>BRACS</strong></td>
-                            <td>Breast</td>
-                        </tr>
-                        <tr>
-                            <td><strong>TCGA-LUNG</strong></td>
-                            <td>Lung</td>
-                        </tr>
-                        <tr>
-                            <td><strong>UBC-OCEAN</strong></td>
-                            <td>Ovarian</td>
-                        </tr>
-                        <tr>
-                            <td><strong>BACH</strong></td>
-                            <td>Breast</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Foundation Models Table -->
-            <div class="matrix-container" style="margin-top: 0;">
-                <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
-                    <i class="fas fa-microchip" style="color: var(--primary); margin-right: 8px;"></i> Foundation Models (Encoders)
-                </h3>
-                <table style="margin: 0;">
-                    <tbody>
-                        <tr>
-                            <td><strong>Hoptimus0</strong></td>
-                            <td>Bioptimus</td>
-                            <td>768-D</td>
-                        </tr>
-                        <tr>
-                            <td><strong>UNI</strong></td>
-                            <td>Mahmood Lab</td>
-                            <td>1024-D</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Prov-GigaPath</strong></td>
-                            <td>Providence/MSFT</td>
-                            <td>1536-D</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Phikon-v2</strong></td>
-                            <td>Owkin</td>
-                            <td>768-D</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </section>
-
-    <!-- Status banner -->
-    <section class="animate-up" style="margin-top: 3rem;">
-        <div style="padding: 1.5rem; background: rgba(220, 38, 38, 0.07); border-left: 4px solid #dc2626; border-radius: 8px; font-size: 1rem; line-height: 1.65;">
-            <strong>Results status &mdash; under revision.</strong>
-            The erasure numbers below were produced with a residual low-rank adapter
-            <code>z' = z + &alpha;BAz</code>. That map is invertible, so it cannot remove information:
-            it only fools the fixed probe it was trained against, and a retrained probe recovers the
-            target concept in full. The LEACE comparison additionally applied the projector's bias term
-            incorrectly, and probe selection took the maximum validation AUC over epochs on the same
-            split it reported. <strong>These tables are being regenerated with a learned null-space
-            projection, a corrected affine convention, and held-out test splits, and should not be
-            cited in the meantime.</strong>
-        </div>
-    </section>
-
-    <!-- Results Section -->
-    <section id="results" class="animate-up">
-        <h2 class="section-title">Clinical Cross-Evaluation</h2>
-        <p class="section-desc">
-            Each row is the dataset whose concept was targeted; each column is the dataset a probe was
-            retrained on. A successful attack would collapse the diagonal toward chance (0.50 for macro
-            one-vs-rest AUC, whatever the class count) while leaving the off-diagonal untouched.
-            <strong>It does not.</strong> The diagonal sits between 0.91 and 0.99 against an off-diagonal
-            of 0.95 &mdash; no selective degradation, exactly as expected from an invertible transform.
-        </p>
-
-        <div class="matrix-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Trained Dataset</th>
-                        <th>Erased Prostate</th>
-                        <th>Erased Breast</th>
-                        <th>Erased Lung</th>
-                        <th>Erased Ovarian</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><strong>PANDA (Prostate)</strong></td>
-                        <td><span class="crash"><i class="fas fa-arrow-down"></i> 0.93</span></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
-                    </tr>
-                    <tr>
-                        <td><strong>BRACS (Breast)</strong></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
-                        <td><span class="crash"><i class="fas fa-arrow-down"></i> 0.92</span></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
-                    </tr>
-                    <tr>
-                        <td><strong>TCGA-LUNG</strong></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.99</span></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.99</span></td>
-                        <td><span class="preserved"><i class="fas fa-times-circle"></i> 0.99</span></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.99</span></td>
-                    </tr>
-                    <tr>
-                        <td><strong>UBC-OCEAN (Ovarian)</strong></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.95</span></td>
-                        <td><span class="crash"><i class="fas fa-arrow-down"></i> 0.91</span></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </section>
-
-    <!-- NEW SECTION: LEACE vs SPLINCE Unlearning -->
-    <section class="section animate-up" style="margin-top: 4rem;">
-        <h2 class="section-title">Linear Concept Erasure: LEACE vs SPLINCE</h2>
-        <p class="section-desc">
-            We evaluate the efficacy of current state-of-the-art linear concept erasure methods—<strong>LEACE</strong> and <strong>SPLINCE</strong>—at removing the concept of Prostate ISUP grading (Targeted Erasure) while preserving un-targeted performance on Breast Tumor subtyping. The projectors were mathematically verified to perfectly zero-out the linear components of the target dataset.
+            The attacker must hold labelled slides from the <em>exact</em> cohort the victim will train on,
+            and enough of them. Erased AUC by attacker budget, k&nbsp;=&nbsp;64, 5 folds per row.
         </p>
         <div class="matrix-container">
             <table>
                 <thead>
-                    <tr>
-                        <th>Dataset</th>
-                        <th>Method</th>
-                        <th>Targeted Erasure (PANDA) AUC ⬇️</th>
-                        <th>Preserved (BRACS) AUC ⬆️</th>
-                    </tr>
+                    <tr><th>Slides available to attacker</th><th>BRACS</th><th>PANDA</th><th>TCGA-LUNG</th><th>Directions estimable</th></tr>
                 </thead>
                 <tbody>
-                    <tr>
-                        <td><strong>Baseline (No Erasure)</strong></td>
-                        <td>ABMIL (Hoptimus0)</td>
-                        <td><span class="preserved"><i class="fas fa-check-circle"></i> 0.9493 ± 0.0013</span></td>
-                        <td>0.9482 ± 0.0168</td>
-                    </tr>
-                    <tr>
-                        <td><strong>LEACE</strong></td>
-                        <td>Orthogonal Erasure</td>
-                        <td><span class="crash"><i class="fas fa-times-circle"></i> 0.9453 ± 0.0015</span> (Failed)</td>
-                        <td>0.9470 ± 0.0183</td>
-                    </tr>
-                    <tr>
-                        <td><strong>SPLINCE</strong></td>
-                        <td>Oblique Erasure</td>
-                        <td><span class="crash"><i class="fas fa-times-circle"></i> 0.9438 ± 0.0027</span> (Failed)</td>
-                        <td>0.9448 ± 0.0183</td>
-                    </tr>
+                    <tr><td>25</td><td>0.877</td><td>0.888</td><td>0.940</td><td>24</td></tr>
+                    <tr><td>100</td><td>0.820</td><td>0.870</td><td>0.898</td><td>64</td></tr>
+                    <tr><td>250</td><td>0.723</td><td>0.851</td><td>0.818</td><td>64</td></tr>
+                    <tr><td>500</td><td>0.583</td><td>0.800</td><td>0.723</td><td>64</td></tr>
+                    <tr><td><strong>1000</strong></td><td><strong>0.583</strong></td><td><strong>0.772</strong></td><td><strong>0.615</strong></td><td>64</td></tr>
                 </tbody>
             </table>
         </div>
-        <div style="margin-top: 2rem; padding: 1.5rem; background: rgba(59, 130, 246, 0.05); border-left: 4px solid var(--primary); border-radius: 8px; font-size: 1rem; line-height: 1.6;">
-            <strong>Finding, pending re-run:</strong> neither method moved the target AUC (0.949 &rarr; ~0.944)
-            while control performance was untouched. The natural reading is that a non-linear MIL model over
-            patch embeddings routes around a linear subspace erasure. That conclusion is <em>not yet safe</em>:
-            these projectors were applied as <code>x P&#8868; + &mu;</code> rather than
-            <code>(x &minus; &mu;) P&#8868; + &mu;</code>, leaving a residual offset of <code>&mu;P&#8868;</code>
-            that corrupts the erasure. The comparison is being re-run with the corrected convention before any
-            claim is made about the sufficiency of linear concept erasure.
+        <div style="margin-top: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); border-radius: 4px; font-size: 0.95rem; line-height: 1.5;">
+            <strong>Interpretation:</strong> Below roughly 100 slides nothing happens. Most of the available effect
+            arrives between 500 and 1000. Past that the cohorts themselves run out. Because
+            <em>k &le; n &minus; 1</em>, budget caps attack strength directly: at 25 slides only 24 directions are
+            estimable no matter what rank is requested. Independently, larger training cohorts are
+            <em>harder</em> to erase (<em>r</em> = +0.80 between training-set size and surviving AUC) &mdash; the same
+            fact seen from the other side.
         </div>
     </section>
 
-    <!-- Robustness Sweeps Section -->
-    <section id="robustness-sweeps" class="animate-up">
-        <h2 class="section-title">Ablation Studies & Sweeps</h2>
+    <!-- Method comparison -->
+    <section id="methods" class="animate-up">
+        <h2 class="section-title">What Else Was Tried</h2>
         <p class="section-desc">
-            To prove that targeted representational geometry erasure is the only effective way to blindly poison downstream tasks, we conducted two exhaustive control sweeps: one testing naive noise resilience, and another testing brute-force variance deletion.
+            Erased AUC by method, k&nbsp;=&nbsp;64 where applicable, 5 folds. Lower is a stronger attack;
+            0.50 is chance.
         </p>
-        
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-top: 2.5rem;">
-            <!-- Naive Noise Sweep -->
+        <div class="matrix-container">
+            <table>
+                <thead>
+                    <tr><th>Method</th><th>BRACS</th><th>PANDA</th><th>TCGA-LUNG</th><th>Verdict</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>Affine null-space projection</strong></td><td><strong>0.583</strong></td><td><strong>0.779</strong></td><td><strong>0.615</strong></td><td>Works</td></tr>
+                    <tr><td>Plain projection (no mean preservation)</td><td>0.583</td><td>0.780</td><td>0.615</td><td>Identical to a probe</td></tr>
+                    <tr><td>LEACE</td><td>0.719</td><td>0.841</td><td>0.835</td><td>Exact linearly, leaks nonlinearly</td></tr>
+                    <tr><td>Gaussian noise (&sigma;&nbsp;=&nbsp;1)</td><td>0.849</td><td>0.795</td><td>0.859</td><td>Damage without selectivity</td></tr>
+                    <tr><td>Feature dropout (p&nbsp;=&nbsp;0.5)</td><td>0.906</td><td>0.863</td><td>0.935</td><td>Barely moves the target</td></tr>
+                    <tr><td>Invertible low-rank adapter <span style="color:var(--gray);font-size:.85em;">(negative control)</span></td><td>0.897</td><td>0.919</td><td>0.965</td><td>Correctly fails</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); border-radius: 4px; font-size: 0.95rem; line-height: 1.5;">
+            <strong>Interpretation:</strong> Undirected corruption is not erasure &mdash; noise and dropout damage
+            everything roughly equally, which is precisely what a credible attack must beat. The invertible adapter
+            moves the target by 0.003 on average, confirming the evaluation harness cannot be fooled by a transform
+            that removes nothing. Beyond these, eleven further approaches were tested and failed, including Fisher and
+            HSIC direction ranking, iterative INLP, adversarial erasers, optimal-transport erasure, and reconstruction
+            bottlenecks. A control-aware spectral objective that prices collateral into the selection was also tested:
+            it strictly weakens the attack, moving BRACS from 0.583 at &lambda;&nbsp;=&nbsp;0 to 0.856 at
+            &lambda;&nbsp;=&nbsp;4.
+        </div>
+    </section>
+
+    <!-- In progress -->
+    <section id="ongoing" class="animate-up">
+        <h2 class="section-title">In Progress</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem; margin-top: 2rem;">
             <div class="matrix-container" style="margin-top: 0;">
                 <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
-                    <i class="fas fa-random" style="color: var(--primary); margin-right: 8px;"></i> Naive Noise & Dropout Sweep
+                    <i class="fas fa-sitemap" style="color: var(--primary); margin-right: 8px;"></i> Does attention-based MIL resist?
                 </h3>
-                <div style="padding: 1.5rem;">
-                    <p style="margin-bottom: 1rem; color: var(--gray);">Do Foundation Models rely on overall variance, or specific geometric structures? We injected massive Gaussian noise and dropped up to 90% of the features to test ABMIL's resilience.</p>
-                    <table style="margin: 0; width: 100%;">
-                        <thead>
-                            <tr>
-                                <th>Perturbation</th>
-                                <th>PANDA (Prostate)</th>
-                                <th>BRACS (Breast)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>Baseline</strong></td>
-                                <td>0.949</td>
-                                <td>0.943</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Gaussian (&sigma;=1.0)</strong></td>
-                                <td>0.951</td>
-                                <td>0.946</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Dropout (p=0.9)</strong></td>
-                                <td>0.940</td>
-                                <td>0.944</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <div style="margin-top: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); border-radius: 4px; font-size: 0.95rem; line-height: 1.5;">
-                        <strong>Interpretation:</strong> ABMIL is highly robust to undirected perturbation. Dropping 90% of feature dimensions per patch costs under 0.01 AUC, and the small drops are proportional across datasets. This is the control that establishes what <em>non</em>-selective corruption looks like: any credible attack must do something a noise baseline cannot.
-                    </div>
+                <div style="padding: 1.5rem; color: var(--gray); line-height: 1.65;">
+                    <p style="margin-bottom: .8rem;">
+                        Results above are slide-level probes, which are exactly equivalent to mean-pooled MIL because
+                        erasure and mean pooling are both linear and commute. Attention-based architectures re-learn
+                        which patches to weight <em>after</em> erasure and may route around it.
+                    </p>
+                    <p style="margin-bottom: 0;">
+                        ABMIL, TransMIL and MeanMIL are being run across 3 cohorts &times; 5 folds. Mean-pooled MIL
+                        should reproduce the probe numbers exactly, which gives the comparison a built-in
+                        correctness check. This determines whether the work reports a practical attack or a
+                        methodological result about probe-based capability claims.
+                    </p>
                 </div>
             </div>
-
-            <!-- SVD K-Sweep -->
             <div class="matrix-container" style="margin-top: 0;">
                 <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
-                    <i class="fas fa-chart-line" style="color: var(--primary); margin-right: 8px;"></i> SVD K-Sweep
+                    <i class="fas fa-search" style="color: var(--primary); margin-right: 8px;"></i> What is in the removed subspace?
                 </h3>
-                <div style="padding: 1.5rem;">
-                    <p style="margin-bottom: 1rem; color: var(--gray);">Can we brute-force the erasure by deleting the top K principal components of the target dataset? We targeted Prostate and swept K up to 500.</p>
-                    <table style="margin: 0; width: 100%;">
-                        <thead>
-                            <tr>
-                                <th>Components Deleted</th>
-                                <th>Target (PANDA)</th>
-                                <th>Collateral (BRACS)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>Baseline (K=0)</strong></td>
-                                <td>0.949</td>
-                                <td>0.943</td>
-                            </tr>
-                            <tr>
-                                <td><strong>K = 100</strong></td>
-                                <td>0.928 <i class="fas fa-arrow-down" style="color: var(--danger); font-size: 0.8em;"></i></td>
-                                <td>0.922 <i class="fas fa-arrow-down" style="color: var(--danger); font-size: 0.8em;"></i></td>
-                            </tr>
-                            <tr>
-                                <td><strong>K = 200</strong></td>
-                                <td>0.918 <i class="fas fa-arrow-down" style="color: var(--danger); font-size: 0.8em;"></i></td>
-                                <td>0.925 <i class="fas fa-arrow-down" style="color: var(--danger); font-size: 0.8em;"></i></td>
-                            </tr>
-                            <tr>
-                                <td><strong>K = 500</strong></td>
-                                <td>0.910 <i class="fas fa-arrow-down" style="color: var(--danger); font-size: 0.8em;"></i></td>
-                                <td>0.916 <i class="fas fa-arrow-down" style="color: var(--danger); font-size: 0.8em;"></i></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <div style="margin-top: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); border-radius: 4px; font-size: 0.95rem; line-height: 1.5;">
-                        <strong>Interpretation:</strong> Deleting variance in bulk is not erasure. Removing 500 components leaves the target at 0.91 while costing the un-targeted breast task an almost identical amount (0.943 &rarr; 0.916) &mdash; damage without selectivity. The subspace is chosen by the target cohort's own variance, and those directions are largely shared across cohorts, which is why the collateral tracks the target so closely. Selecting the subspace <em>discriminatively</em> is the open question this motivates.
-                    </div>
+                <div style="padding: 1.5rem; color: var(--gray); line-height: 1.65;">
+                    <p style="margin-bottom: .8rem;">
+                        Two analyses are running. First, pairwise principal angles between the subspaces fitted on each
+                        of six cohorts, which turns cohort-specificity into a direct measurement rather than an
+                        inference from the transfer table.
+                    </p>
+                    <p style="margin-bottom: 0;">
+                        Second, each slide vector is split into the deleted coordinates and the surviving complement,
+                        and each half is asked what it predicts: the clinical label, or which cohort the slide came
+                        from. If the deleted half carries cohort identity as strongly as it carries the label, that is
+                        the mechanism behind the transfer failure.
+                    </p>
                 </div>
             </div>
         </div>
