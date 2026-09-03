@@ -30,29 +30,77 @@ from src.unlearning.subspace import discriminative_subspace, svd_subspace
 DEFAULT_METADATA = 'data/multi_benchmark_metadata.csv'
 
 
-def load_patch_features(df, encoder_dir, max_slides, patches_per_slide, seed=0):
-    """Sample patch embeddings from a cohort. Returns [N, D]."""
+def build_index(encoder_dirs):
+    """Map h5 basename -> full path, listing each feature root exactly once."""
+    index = {}
+    for d in encoder_dirs:
+        try:
+            names = os.listdir(d)
+        except OSError:
+            print(f"  (feature root unreadable, skipped: {d})")
+            continue
+        n0 = len(index)
+        for nm in names:
+            if nm.endswith('.h5'):
+                index.setdefault(nm, os.path.join(d, nm))
+        print(f"  indexed {len(index) - n0:6d} new slides from {d}")
+    return index
+
+
+def load_patch_features(df, encoder_dirs, max_slides, patches_per_slide, seed=0,
+                        block=32):
+    """
+    Sample patch embeddings from a cohort. Returns [N, D].
+
+    encoder_dirs is a LIST, tried in order per slide. "The rest" spans cohorts -
+    PROSTATE's negatives are TCGA, BRACS, BACH and UBC-OCEAN - and each cohort
+    has its own feature root, so a single directory cannot resolve them. With one
+    directory the negative set came back empty and the fit aborted:
+    "X_pos: [64000, 2560], X_neg: [0]". That matters even for plain SVD, whose
+    subspace uses only X_pos, because `mu` is the mean pooled over BOTH cohorts.
+    """
+    if isinstance(encoder_dirs, str):
+        encoder_dirs = [encoder_dirs]
     rng = np.random.RandomState(seed)
     if len(df) > max_slides:
         df = df.sample(max_slides, random_state=seed)
 
+    # Index each root ONCE. Probing the directories in order instead cost up to
+    # five failed h5py opens per slide, and on Lustre that overran a 55-minute
+    # walltime on 2000 slides without finishing a single fit.
+    index = build_index(encoder_dirs)
+
     chunks, missing = [], 0
     for _, row in df.iterrows():
-        path = os.path.join(encoder_dir, to_h5_name(row['filename']))
+        path = index.get(to_h5_name(row['filename']))
+        if path is None:
+            missing += 1
+            continue
         try:
             with h5py.File(path, 'r') as f:
                 feats = f['features']
                 n = feats.shape[0]
                 if n > patches_per_slide:
-                    idx = np.sort(rng.choice(n, patches_per_slide, replace=False))
-                    chunks.append(torch.tensor(feats[idx]))
+                    # Contiguous slabs, not scattered rows. Features are chunked
+                    # (1, D) on disk, so 64 random indices means 64 random chunk
+                    # reads; on Lustre that ran ~1 slide/s and blew the walltime
+                    # twice. Evenly spaced blocks keep the sample spread across
+                    # the slide while making it a handful of sequential reads.
+                    # Same reasoning as slab_starts() in quick_validate.py.
+                    n_blocks = max(1, patches_per_slide // block)
+                    size = max(1, patches_per_slide // n_blocks)
+                    starts = np.unique(np.linspace(0, max(n - size, 0),
+                                                   n_blocks).astype(int))
+                    take = [feats[st:st + size] for st in starts]
+                    chunks.append(torch.tensor(np.concatenate(take, 0)))
                 else:
                     chunks.append(torch.tensor(feats[:]))
         except (OSError, KeyError):
             missing += 1
 
     if missing:
-        print(f"  ({missing} of {len(df)} slides unreadable under {encoder_dir})")
+        print(f"  ({missing} of {len(df)} slides unreadable under "
+              f"{len(encoder_dirs)} director{'y' if len(encoder_dirs)==1 else 'ies'})")
     if not chunks:
         return torch.empty(0)
     return torch.cat(chunks, dim=0).float()
@@ -102,7 +150,9 @@ def verify_affine(X_pos, X_neg, P, b):
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--encoder_dir', required=True)
+    parser.add_argument('--encoder_dir', required=True,
+                        help="comma-separated feature roots; slides are resolved "
+                             "against each in turn, so 'the rest' can span cohorts")
     parser.add_argument('--forget_organ', required=True,
                         help="organ to erase, e.g. PROSTATE / BREAST / LUNG / OVARIAN")
     parser.add_argument('--metadata', default=DEFAULT_METADATA)
@@ -136,9 +186,10 @@ def main():
     print(f"Fitting {args.method} eraser for {args.forget_organ} vs rest "
           f"({len(pos_df)} vs {len(neg_df)} slides)...")
 
-    X_pos = load_patch_features(pos_df, args.encoder_dir, args.max_slides,
+    enc_dirs = [d for d in args.encoder_dir.split(',') if d]
+    X_pos = load_patch_features(pos_df, enc_dirs, args.max_slides,
                                 args.patches_per_slide, args.seed)
-    X_neg = load_patch_features(neg_df, args.encoder_dir, args.max_slides,
+    X_neg = load_patch_features(neg_df, enc_dirs, args.max_slides,
                                 args.patches_per_slide, args.seed + 1)
     print(f"X_pos: {list(X_pos.shape)}, X_neg: {list(X_neg.shape)}")
 

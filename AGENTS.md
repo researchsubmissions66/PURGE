@@ -42,6 +42,91 @@ same eraser. Only from-scratch retrained probes count.
 
 ---
 
+## AUTHORITATIVE RESULTS — full 5-fold sweep (2026-09-02)
+
+`results/sweep_full/`, 276 configs, **every axis crossed with all 5 folds**.
+Reproduce with `python scripts/analyze_sweep.py --out_dir results/sweep_full`.
+Where a number below disagrees with one further down this file, **this section
+wins** — the older ones are fold-0 singletons or predate the analyzer fix in
+trap 17.
+
+Base settings: virchow2, affine SVD, k=64, max_slides=2000, mlp probe, chance 0.50.
+
+| target | baseline | erased | sd | n |
+|---|---|---|---|---|
+| BRACS-atypia | 0.8927 | **0.5792** | 0.091 | 36 |
+| PANDA-grade | 0.9105 | **0.7791** | 0.014 | 36 |
+| TCGA-LUNG-subtype | 0.9675 | **0.6148** | 0.026 | 31 |
+
+Significant vs baseline on all 8 encoders. Reaches **chance** only for
+BRACS-atypia, and only on 6 of 8 (not conch_v15, not virchow2). Encoder explains
+27-39% of the variance, fold 14-35%, so encoder-dependence is real but is not
+much larger than fold noise for PANDA.
+
+### Rank: the k=64 saturation was an artifact, chance needs k>=256
+
+| k | BRACS | PANDA | TCGA-LUNG |
+|---|---|---|---|
+| 8 | 0.8200 | 0.8768 | 0.8933 |
+| 64 | 0.5834 | 0.7794 | 0.6151 |
+| 256 | 0.4953 | 0.5994 | 0.5362 |
+| 512 | 0.5280 | **0.5306** | **0.4781** |
+
+All three reach chance at k=512, replicated over 5 folds. Since `k <= n_fit - 1`,
+running the attack where it actually works needs **>= 513 fitting slides**.
+
+### Cross-cohort transfer fails, and misfires
+
+| fit_on \\ target | BRACS-atypia | PANDA-grade | TCGA-LUNG |
+|---|---|---|---|
+| BACH-histology | 0.8983 | 0.9196 | 0.9643 |
+| BRACS-atypia | *0.5834* | 0.9068 | 0.9635 |
+| PANDA-grade | 0.9014 | *0.7794* | 0.9644 |
+| UBC-OCEAN-subtype | 0.8872 | 0.9139 | 0.9496 |
+
+Every one of the sweep's five weakest configurations is a cross-cohort run, each
+with NEGATIVE target drop and collateral around +0.09: fitting on the wrong
+cohort damages the controls *more than the target*. The subspace is a property of
+the cohort's feature geometry, not of the concept.
+
+### Attacker budget (5 folds per row)
+
+| n_fit | BRACS | PANDA | TCGA-LUNG | eff_k |
+|---|---|---|---|---|
+| 25 | 0.877 | 0.888 | 0.940 | 24 |
+| 100 | 0.820 | 0.870 | 0.898 | 64 |
+| 250 | 0.723 | 0.851 | 0.818 | 64 |
+| 500 | 0.583 | 0.800 | 0.723 | 64 |
+| 1000 | 0.583 | 0.772 | 0.615 | 64 |
+
+Nothing happens below ~100 slides. Most of the effect by 500-1000. Beyond that
+the cohorts run out (BRACS caps at 445 usable, lung at 834).
+
+### Probe ladder — accessibility, not content (5 folds, 7 families)
+
+| probe | BRACS | PANDA | TCGA-LUNG |
+|---|---|---|---|
+| logreg | 0.4553 | 0.5648 | 0.5335 |
+| mlp | 0.5834 | 0.7794 | 0.6151 |
+| mlp_big | 0.6163 | 0.8042 | **0.7594** |
+
+A bigger readout recovers more on every target.
+
+### Other axes
+
+* **Spectral pencil is a strict loss.** lam=0 is best (0.583) and erased AUC rises
+  monotonically to 0.856 at lam=4. Pricing controls into the objective only
+  weakens the attack. lam=0 == plain SVD to 4 decimals (superset check passes).
+* **Methods**: svd 0.583 / svd_plain 0.583 (affine makes no difference to a
+  probe) / leace 0.719 / gaussian 0.849 / dropout 0.906 / low_rank 0.897.
+* **Seed** changes nothing (0.5834 vs 0.5834). The variance is fold, not seed.
+* **Confound ladder**, n=1519: cross-organ +0.0052, same-organ +0.0138,
+  same-slides +0.0486.
+* **`n_train` correlates +0.798 (p<1e-4) with erased AUC** — bigger cohorts are
+  harder to erase. Same fact as the budget curve, seen from the other side.
+
+---
+
 ## What works: affine SVD null-space projection
 
 `--unlearn_method svd`, the default. Fit the target cohort's top-k principal
@@ -238,7 +323,57 @@ PANDA-grade, MLP probe:
 * `spectral_erasure_loss()` is the differentiable form - the route to plan section 19
   (poison the encoder itself rather than bolting on a projection). Untested.
 
-### 7. LEACE — exact linearly, leaks nonlinearly
+### 7. Quadratic / optimal-transport erasure — fails structurally
+
+`QuadraticEraser` (vendored, previously never run). Equalises class-conditional
+means AND covariances by transporting each class to the Wasserstein barycenter -
+exactly the second-order structure LEACE leaves behind. It does not work here.
+
+Diagnostic (TCGA-LUNG, fit on 487 train, applied to 113 test):
+
+| m | cond(Sigma_c) | TRAIN class-mean spread | TEST class-mean spread |
+|---|---|---|---|
+| 16 | 4.3e+01 | 2.868 -> **0.000** | 2.766 -> 1.327 (-52%) |
+| 32 | 2.4e+02 | 2.921 -> **0.000** | 2.926 -> 1.471 (-50%) |
+| 64 | 8.6e+02 | 2.931 -> **0.000** | 2.958 -> 1.530 (-48%) |
+
+**Exact on the fitting data, ~50% on held-out data, flat across a 20x range in
+condition number and identical with `shrinkage=False`.** So it is NOT ill-
+conditioning, NOT shrinkage, and NOT the fitting sample size.
+
+The transform is `(x - mu_c^train) A_c + mu_global` with `A_c` built from
+`Sigma_c^{-1/2}`. That inverse amplifies the LOW-VARIANCE directions - precisely
+where the *test* class-mean estimate is noisiest (n_test = 113, ~56/class). The map
+removes the train-estimated mean exactly and inflates whatever the test mean
+disagrees by.
+
+**This is a property of transport-based erasure, not of this implementation.** Any
+method that whitens by an estimated class covariance inherits it - including
+kernelised LEACE / random-Fourier-feature erasure, which has the same inverse in
+the RKHS. Do not build those expecting a different outcome.
+
+Erasure quality, quadratic-in-principal-subspace vs plain affine SVD:
+
+| task | quadratic (best) | plain affine SVD |
+|---|---|---|
+| TCGA-LUNG | 0.5938 (m=128) | **0.4661** (k=64) |
+| PANDA-grade | 0.4739 (m=64), 0.4786 (m=32) | 0.4832 (k=64) |
+
+The AUC tracks `m` (how many dimensions are restricted) while the mean-spread
+reduction stays flat at ~48% - i.e. **the erasure comes from the subspace
+restriction, not from the transport**. Quadratic at m=128 (0.5938) is
+indistinguishable from plain SVD at k=256 (0.5951).
+
+One unexplored positive: on PANDA, quadratic reaches chance at m=32 where plain SVD
+needs k=64. If that survives a collateral measurement it would mean equal erasure
+for half the destroyed dimensions. Untested, and oracle-labelled either way.
+
+**Oracle constraint.** `QuadraticEraser.__call__(x, z)` needs the label per sample
+and maps each class to a shared barycenter, so it is NOT a fixed transform and is
+undefined off-cohort. It cannot be a released artefact; it only fits a
+dataset-poisoning framing where the attacker labels what they publish.
+
+### 8. LEACE — exact linearly, leaks nonlinearly
 
 Hits **exactly 0.5000** on a logistic probe every time (its guarantee, and it
 holds once the bias is applied correctly). Against an MLP: 0.6823 / **0.9638** /
@@ -248,7 +383,57 @@ fails."
 
 ---
 
+### 9. Nonlinear bottleneck + HSIC — fails, and generalises the mechanism
+
+`src/unlearning/bottleneck.py`. `z' = dec(enc(z))`, m < d, trained on fidelity
+(target + all controls) plus `lambda_t * HSIC(enc(z), y_target)`. Chosen because it
+avoids BOTH known mechanisms: it selects no directions and inverts no covariance.
+It fails anyway.
+
+| | TCGA-LUNG | PANDA-grade |
+|---|---|---|
+| baseline | 0.9335 | 0.8496 |
+| **svd_k64** | **0.5505** | **0.5121** |
+| bottleneck m=64 | 0.8211 | 0.8672 |
+| bottleneck m=256 | 0.8754 | 0.8744 |
+| bottleneck m=512 | 0.8358 | 0.8775 |
+
+On PANDA the drop is NEGATIVE. HSIC did optimise (0.015 -> 0.001, -93%); it simply
+is not a strong enough counterweight.
+
+**MECHANISM 3: reconstruction preserves what erasure must destroy.** Final fidelity
+0.019 - the autoencoder is 98% lossless, and a lossless map erases nothing by
+definition. Confirmed on a purpose-built synthetic case where the bottleneck should
+excel (class sets the RADIUS in a 2-D plane, so both classes share a mean and every
+principal direction, and no projection can reach it): 0.973 -> **0.998**. It removes
+nothing even there. Pinned by
+`tests/test_erasers.py::test_reconstruction_objective_defeats_erasure`.
+
+This mechanism retroactively explains two earlier failures catalogued separately:
+the reconstruction head (#3) and the spectral encoder objective, which relocated
+signal rather than destroying it. **Any objective containing a fidelity term is
+simultaneously asking to keep and to remove the same information.**
+
+Incidental findings worth keeping:
+* A 64-d nonlinear code reconstructs 2560-d Virchow2 embeddings to 2% error -
+  these representations have very low intrinsic dimension.
+* Centred cos(z, z') 0.91-0.96, vs ~0.39 for affine SVD. Far more faithful, and
+  entirely on the wrong end of the trade-off.
+
 ## The central negative result
+
+**Eleven attempts have failed, under THREE mechanisms.**
+
+| mechanism | kills |
+|---|---|
+| task info is distributed, not concentrated | 6 selection methods |
+| `Sigma^-1/2` does not generalise out of sample | transport family, incl. kernelised LEACE |
+| reconstruction preserves what erasure must destroy | reconstruction head, spectral encoder objective, bottleneck |
+
+Affine SVD is not a baseline that resisted improvement - it is the only
+construction that RESOLVES the third tension, by deleting a specific subspace
+outright instead of trying to preserve and remove at once. Its crudeness is why it
+works.
 
 **Six independent attempts at smarter direction selection all failed to beat
 plain variance ranking on erasure strength:**
@@ -273,6 +458,174 @@ would die together; instead grading drops to 0.48 while detection holds at 0.79 
 the SAME slides. The top principal directions appear to carry fine morphological
 variation (which grading needs) more than the coarse tumour-presence signal (which
 detection needs).
+
+## The ceiling: k is capped by n, and the curve saturates long before it
+
+Extended sweep (MLP probe, affine SVD, fold 0):
+
+| k | TCGA-LUNG | PANDA-grade |
+|---|---|---|
+| 16 | 0.7542 | 0.7158 |
+| 64 | **0.4661** | 0.4832 |
+| 128 | 0.4834 | **0.4300** |
+| 256 | 0.5951 | 0.4364 |
+| 512 | 0.4873 | 0.4685 |
+| 1024 | 0.4873 | 0.4685 |
+
+**k=512 and k=1024 are IDENTICAL** because `svd_subspace` clamps to n-1: TCGA-LUNG
+has 487 train slides (cap 486), PANDA 349 (cap 348). **You cannot remove more
+directions than you have samples.** With d=2560 and n~500 that is a permanent
+ceiling of ~19% of the space for WSI cohorts - a structural property of the regime,
+not a hyperparameter.
+
+**The curve saturates far below that ceiling.** Erasure drops fast to k~64-128 then
+oscillates in 0.43-0.60 and never improves. Removing 7x more directions buys
+nothing. Collateral does NOT grow either (TCGA-LUNG controls hold 0.90-0.92 at
+maximum k; PANDA-detect sits at 0.75-0.80 throughout, flat in k). **There is no
+erasure/collateral trade-off curve past k~64 - the method simply saturates.**
+
+Composition `svd_k -> LEACE` is within noise of SVD alone (best case PANDA
+svd256_then_leace 0.3685, but that is BELOW chance on ~100 test samples, i.e.
+inversion noise). LEACE has nothing left to remove after the projection.
+
+**Conclusion: the residual is irreducible within this family.** Three independent
+lines agree - more directions do not help, a high-capacity probe recovers 0.62, and
+nonlinear features of the surviving subspace recover 0.73. The surviving signal is
+NOT in the principal span, so principal-span removal cannot reach it.
+
+## THE POOLED PROXY IS A MEANMIL RESULT - ABMIL RESISTS 3x
+
+Identical eraser (LUNG k=64), identical slides, TCGA-LUNG, real patch bags,
+BOTH FOLDS COMPLETE:
+
+| fold | MeanMIL drop | ABMIL drop |
+|---|---|---|
+| 0 | 0.9726 -> 0.7684 (+0.204) | 0.9825 -> 0.9164 (+0.066) |
+| 1 | 0.9712 -> 0.7448 (+0.227) | 0.9866 -> 0.9425 (+0.044) |
+| **mean** | **+0.2154** | **+0.0551** |
+
+**ABMIL resists 3.9x.** Erased ABMIL sits at 0.92-0.94 against baselines of
+0.98-0.99: roughly five points. Against attention-based MIL this is not an attack.
+
+**Attention pooling routes around the erasure.** ABMIL re-learns which patches to
+attend to and finds ones where the signal survives; mean pooling cannot.
+
+**Consequence: every pooled-feature result in results/sweep_v2 is a MEANMIL
+result.** The proxy's guarantee is that erasure commutes with mean pooling - which
+is exact, and which is precisely why it does NOT extend to ABMIL. Reporting pooled
+numbers as ABMIL numbers would overstate the attack roughly threefold, and a
+reviewer running ABMIL would find it immediately.
+
+**Why attention defeats it.** The eraser removes a fixed subspace from every
+patch. Mean pooling then averages patches that have all lost the same directions,
+so the slide vector is genuinely degraded. ABMIL RE-LEARNS ITS ATTENTION after
+erasure and concentrates on whichever patches still carry signal - the information
+was never removed from the bag, only from a subspace of each patch.
+
+This is the same phenomenon as the residual chased all session (0.47 standard probe
+/ 0.62 high-capacity / 0.73 given nonlinear features): **subspace removal does not
+destroy information, it makes it harder to reach, and a model with a learned
+pooling mechanism reaches it.**
+
+Caveats: this eraser is the weaker patch-fitted one
+(300 slides), so absolute values may move - but both models saw the IDENTICAL
+transform, so the ratio stands. ABMIL's higher baseline (0.9825) gives it more
+headroom, though not enough to explain 3x.
+
+**Any headline claim must be measured with ABMIL, not the proxy.** Use the proxy
+for breadth (it is ~100x cheaper) and confirm every claim with MIL.
+
+### NOTE: the two pipelines fit erasers differently
+
+`quick_validate`/`run_config` fit on the target TASK's train split using SLIDE-MEAN
+vectors. `fit_unlearner.py` fits on an ORGAN using PATCH-level features. They are
+not interchangeable, and cross-pipeline magnitudes are not comparable:
+
+| | pooled | MIL |
+|---|---|---|
+| fitted on | task train split | organ |
+| features | slide means | patches (64/slide) |
+| slides | ~841 | 300 |
+| TCGA-LUNG result | 0.9619 -> 0.6070 | 0.9726 -> 0.7684 |
+
+Only WITHIN-pipeline comparisons are valid until this is unified.
+
+## THE THREAT MODEL HAS TWO BUDGETS
+
+When is the attack applied? **Both train and test** - the eraser is fitted on the
+attacker's data, then applied to everything the victim sees. That is POISONING
+(poisoned dataset, or poisoned encoder), not evasion. Fitting on train and
+evaluating on held-out test keeps the attacker away from the victim's eval data.
+
+### Attacker budget (`n_fit`) - the attack is not cheap
+
+virchow2, k=64 requested, max_slides=2000:
+
+| n_fit | effective k | TCGA-LUNG | PANDA-grade | BRACS-atypia |
+|---|---|---|---|---|
+| (baseline) | - | 0.9619 | 0.8978 | 0.8789 |
+| 25 | **24** (clamped) | 0.9214 | 0.8922 | 0.8070 |
+| 250 | 64 | 0.8479 | 0.8468 | 0.6778 |
+| full (373-1148) | 64 | 0.6070 | 0.7685 | 0.4313 |
+
+**Budget caps attack strength through the rank clamp**: `k <= n_fit - 1`, so an
+attacker with 25 slides can remove at most 24 directions however large a k they
+request. Budget and rank are NOT independent knobs. `run_config.py` records
+`effective_k` for this reason - never trust the requested k.
+
+At 25 slides the attack barely functions. It needs hundreds to low thousands of
+slides - and for the supervised variants, LABELLED ones. State that.
+
+### Victim budget - cuts the other way, and we had been measuring the weak end
+
+Identical eraser and k, only the victim's training data changes:
+
+| target | erased @600 slides | erased @2000 slides |
+|---|---|---|
+| TCGA-LUNG | 0.4661 | **0.6070** |
+| PANDA-grade | 0.4832 | **0.7685** |
+| BRACS-atypia | 0.4269 | 0.4313 |
+
+**More victim data -> weaker erasure.** A fixed 64-direction removal does not keep
+up with a probe trained on 1148 slides instead of 349. Every headline number
+before this was measured at the victim's WEAKEST setting - the same class of
+optimism as reporting fold 0.
+
+**So the attack's success is the GAP between the two budgets.** A well-resourced
+victim substantially defeats it. A reviewer training on all 10,616 PANDA slides
+would find this immediately.
+
+### Cross-cohort transfer: MEASURED, AND IT FAILS COMPLETELY
+
+`fit_on` fits the eraser on one cohort and attacks another (virchow2, k=64).
+Target-AUC drop:
+
+| eraser fitted on | -> TCGA-LUNG | -> PANDA-grade | -> BRACS-atypia |
+|---|---|---|---|
+| **same cohort** | **+0.470** | **+0.374** | **+0.457** |
+| BACH-histology | +0.000 | -0.023 | +0.084 |
+| BRACS-atypia | -0.000 | -0.022 | (same) |
+| PANDA-grade | +0.003 | (same) | -0.002 |
+| UBC-OCEAN-subtype | +0.021 | -0.023 | +0.037 |
+
+**Every off-diagonal cell is within noise of zero; several are negative.** BACH ->
+BRACS is the same ORGAN and still transfers nothing (+0.084).
+
+**Consequences.**
+* The **poisoned-encoder** story (plan section 23) is DEAD. It requires a released
+  E_theta' to erase the target on data the attacker never saw. It does not.
+* The defensible story is the **poisoned dataset**: the attacker must control the
+  specific cohort the victim trains on.
+* This also explains the encoder-dependence seen earlier - the eraser fits
+  COHORT-SPECIFIC structure, not a transferable concept direction. Consistent with
+  the central finding that task information lives in *that cohort's* principal span.
+
+**The honest threat model:** an adversary who controls a specific labelled cohort
+(hundreds to thousands of slides) can degrade one downstream task ON THAT COHORT
+while leaving other tasks on the same slides intact. It does not transfer to other
+cohorts, and it weakens as the victim's training set grows.
+
+plan.md section 23 needs revising before anything is written.
 
 ## How strong is the erasure, honestly
 
@@ -428,9 +781,88 @@ class signal against per-image noise; aim for a baseline of 0.80-0.95.
     Always centre before computing similarity, and report the shared-mean energy
     fraction alongside.
 
-12. **BRACS-atypia is underpowered** — 167 cached slides of 4,539 available, ~133
+12. **Same-slide task pairs go degenerate under oracle erasure.** PANDA-grade
+    excludes ISUP_0, so on the grade-labelled subset every slide is cancer and
+    PANDA-detect is constant. Same for BRACS atypia vs malignancy. Oracle methods
+    cannot be evaluated for collateral on these pairs.
+
+13. **`run_id` does not identify a configuration.** It is built from the VARIED
+    keys only, so editing a base setting in `configs/sweep.yaml` (max_slides
+    600 -> 2000, n_splits, the control list) leaves the filename unchanged while
+    the experiment changes. Results are then silently reused and the analysis
+    pools incomparable settings - 17 files were contaminated this way, covering
+    `base`, every `k-*` config and the method arms. `run_config.py` now compares
+    an existing result's config against the current one on 16 settings keys and
+    recomputes on mismatch. Quarantined copies are in `results/_stale_sweep_v2/`.
+
+14. **`/tmp` is node-local on Delta.** A file written on the login node is not
+    visible to a compute job; a batch list placed there reads as empty and the job
+    reports "0 items processed" with no error. Keep anything a job must read on the
+    shared filesystem.
+
+15. **Feature coverage is not uniform across encoders.** `conch_v15` and `virchow`
+    have ZERO BACH slides while every other encoder has 400; `uni_v2` has 5848
+    TCGA slides against everyone else's ~2169. Check FILE COUNTS, not directory
+    existence - an empty directory passes an `isdir` test and then fails at load.
+
+16. **BRACS-atypia is underpowered** — 167 cached slides of 4,539 available, ~133
    training. Every method is unstable there (0.90 → 0.20 → 0.47 across k). Prefer
    the PANDA pair (~470 training slides) for same-slides claims.
+
+17. **A filter helper that misses one axis silently corrupts every number that
+   uses it.** `analyze_sweep.base_settings()` filtered `n_fit`, `max_slides`,
+   `patches` and `seed` but not `fit_on` or `probe`. A cross-cohort run is
+   `method=svd, k=64, fold=0, n_fit=None, max_slides=2000` — it passes every
+   remaining filter, and its erased AUC is high *by construction* (transfer
+   fails), so all four of them were being averaged into the base means. The
+   7-probe-family run leaked five extra probes the same way. Effect: headline
+   erased AUCs read 0.5778 / 0.7932 / 0.6660 when the correct values are
+   **0.5451 / 0.7772 / 0.6156** — the attack was reported as *weaker* than it is
+   — and the `spectral(lam=0) == svd` check read 0.4312 vs 0.5254 and was
+   recorded for a day as an unexplained method failure. It was not: the two
+   subspaces agree to `min singular value 1.000000` on real features at k=16,
+   64 and 256, and once the filter is fixed the check passes on all three
+   targets. **A validation check that fails is at least as likely to indict the
+   analyzer as the method.** Verify the mechanism directly before believing an
+   aggregate.
+
+18. **`fit_on` is recorded per target and equals the target for a normal run.**
+   It is therefore never NaN, and `d[d.fit_on.isna()]` drops every row rather
+   than keeping the non-cross-cohort ones. The correct test is
+   `fit_on.isna() | (fit_on == target)`.
+
+19. **Never edit a shell script while bash is executing it.** Bash re-reads the
+   file from its current byte offset, so inserting lines shifts everything after
+   the cursor and execution resumes mid-statement. Patching `mil_driver.sh` while
+   it ran killed it with `syntax error near unexpected token ')'` even though
+   `bash -n` on the file passed. Write a new file and relaunch instead.
+
+20. **`fit_unlearner.py` takes ONE `--encoder_dir` but "the rest" spans five
+   cohort roots.** PROSTATE's negatives are TCGA / BRACS / BACH / UBC-OCEAN, each
+   under its own root, so a single directory silently resolved zero of them:
+   `X_pos: [64000, 2560], X_neg: [0]`. This matters even for plain SVD, whose
+   subspace uses only `X_pos`, because `mu` is the mean pooled over BOTH cohorts.
+   `--encoder_dir` now accepts a comma-separated list, tried per slide.
+   Organ -> cohort: LUNG=TCGA, PROSTATE=PANDA, BREAST=BRACS(4539)/BACH(400)/TCGA(960).
+
+21. **An eraser fitted with a truncated negative set is not comparable to one
+   fitted properly.** The original `LUNG_k64.pt` used the master_benchmark root,
+   so its "rest" was TCGA-BRCA alone. Its results are in
+   `results/_superseded_mil/`. If you refit one organ's eraser, refit all of them.
+
+22. **Never read scattered rows from these h5 files.** Features are chunked
+   `(1, D)` on disk, so `feats[sorted_random_idx]` is one random chunk read per
+   patch. On Lustre that ran at ~1 slide/s and killed two consecutive 55-minute
+   eraser fits before a single one finished. Reading evenly spaced CONTIGUOUS
+   slabs instead gives 0.62 s/slide for TCGA and 0.42 s/slide for the mixed
+   negative set — a 1000-slide fit drops from >55 min to ~17 min — and keeps the
+   sample spread across the slide. `quick_validate.slab_starts()` had already
+   solved this; `fit_unlearner.py` had not, and the two were not sharing code.
+
+23. **`pgrep -f <script>` matches the process doing the grepping.** A monitor
+   whose own command line mentions `mil_driver2.sh` matched itself and reported
+   the driver alive after it had exited. Same failure as the `pkill` trap that
+   cost three attempts earlier. Use `ps -eo args | grep "[b]ash scripts/x.sh"`.
 
 ---
 

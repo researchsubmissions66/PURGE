@@ -493,3 +493,91 @@ def test_projection_destroys_a_planted_signal():
     zp = er(z)
     assert zp[:, 0].abs().max() < 1e-4
     assert linear_r2(zp[:, :1], y.float()) < 0.05
+
+
+def test_bottleneck_output_is_a_function_of_the_code_only():
+    """
+    The DPI guarantee rests on z' depending on z ONLY through the m-dim code.
+    Two inputs with the same code must give the same output.
+    """
+    from src.unlearning.bottleneck import BottleneckEraser
+    torch.manual_seed(0)
+    er = BottleneckEraser(input_dim=D, code_dim=8, hidden=32)
+    er.eval()
+    z = torch.randn(16, D)
+    with torch.no_grad():
+        code = er.encode(z)
+        # Decode the code directly; must match the full forward pass.
+        assert torch.allclose(er.dec(code), er(z), atol=1e-6)
+
+
+def test_bottleneck_declares_its_cap_to_the_audit():
+    from src.unlearning.bottleneck import BottleneckEraser
+    torch.manual_seed(0)
+    er = BottleneckEraser(input_dim=D, code_dim=8, hidden=32)
+    report = audit_eraser(er, D)
+    assert report['invertible'] is False
+    assert report['rank'] == 8
+
+
+def test_reconstruction_objective_defeats_erasure():
+    """
+    NEGATIVE RESULT, pinned deliberately.
+
+    A reconstruction term asks the model to PRESERVE z; an erasure term asks it to
+    DESTROY part of z. Reconstruction wins, even on a signal purpose-built for the
+    bottleneck to excel at.
+
+    The fixture verifies itself first: the class sets the RADIUS in a 2-D plane, so
+    both classes share a mean and every principal direction (no projection can
+    reach it), the radius feature separates the classes (the signal exists), and no
+    linear readout finds it (it is genuinely nonlinear).
+
+    Measured: 0.973 -> 0.998 here, and on real Virchow2 features the autoencoder
+    reconstructed 2560-d embeddings through a 64-d code at 2% error while erasing
+    nothing (TCGA-LUNG 0.9335 -> 0.8211, PANDA 0.8496 -> 0.8672 i.e. worse than
+    baseline). See AGENTS.md.
+
+    If someone finds an objective that breaks this tension, THIS TEST SHOULD FAIL -
+    that is the point of pinning it.
+    """
+    from src.unlearning.bottleneck import BottleneckEraser, fit_bottleneck
+    torch.manual_seed(0)
+
+    n = 3000
+    y = torch.randint(0, 2, (n,))
+    theta = torch.rand(n) * 6.2832
+    radius = 2.0 + y.float() * 5.0
+    z = torch.randn(n, D)
+    z[:, 0] += radius * torch.cos(theta)
+    z[:, 1] += radius * torch.sin(theta)
+    tr, te = slice(0, 2200), slice(2200, n)
+
+    from sklearn.metrics import roc_auc_score
+    assert roc_auc_score(y.numpy(), z[:, :2].norm(dim=1).numpy()) > 0.95
+    assert linear_r2(z[te], y[te].float()) < 0.25, "signal was linearly readable"
+
+    def nonlinear_auc(Xtr, ytr, Xte, yte):
+        from sklearn.neural_network import MLPClassifier
+        from sklearn.pipeline import make_pipeline
+        from sklearn.preprocessing import StandardScaler
+        c = make_pipeline(StandardScaler(),
+                          MLPClassifier((256, 128), max_iter=1200, random_state=0))
+        c.fit(Xtr, ytr)
+        return roc_auc_score(yte, c.predict_proba(Xte)[:, 1])
+
+    before = nonlinear_auc(z[tr].numpy(), y[tr].numpy(), z[te].numpy(), y[te].numpy())
+    assert before > 0.85, f"fixture broken: signal not recoverable ({before:.3f})"
+
+    er = BottleneckEraser(input_dim=D, code_dim=16, hidden=128)
+    fit_bottleneck(er, z[tr], y[tr], lambda_t=50.0, steps=600,
+                   batch_size=256, verbose=False)
+    with torch.no_grad():
+        a_tr, a_te = er(z[tr]), er(z[te])
+
+    after = nonlinear_auc(a_tr.numpy(), y[tr].numpy(), a_te.numpy(), y[te].numpy())
+    # The documented outcome: erasure does NOT happen.
+    assert after > before - 0.15, (
+        f"bottleneck erased more than expected ({before:.3f} -> {after:.3f}); "
+        "the reconstruction/erasure tension may have been broken - update AGENTS.md"
+    )

@@ -41,6 +41,7 @@ from src.datasets.feature_dataset import build_label_map, select_dataset, to_h5_
 from src.evaluation.metrics import macro_ovr_auc, selective_degradation_score
 from src.evaluation.tasks import TASKS, get_task, relation
 from src.unlearning.subspace import remove_subspace_affine, svd_subspace
+from src.unlearning.bottleneck import BottleneckEraser, fit_bottleneck
 from src.unlearning.spectral import spectral_subspace
 from src.utils.splits import patient_folds
 
@@ -68,8 +69,7 @@ def load_pooled(dataset, encoder_dir, metadata, patches, workers, cache_dir,
                 seed=0, block=32, max_slides=None):
     """Mean-pool each slide over a strided patch subsample. Cached to .npz."""
     tag = f"{dataset}_{os.path.basename(encoder_dir)}_p{patches}"
-    if max_slides:
-        tag += f"_n{max_slides}"
+    tag += f"_n{max_slides}" if max_slides else "_nall"
     cache = os.path.join(cache_dir, tag + ".npz")
     if os.path.exists(cache):
         d = np.load(cache, allow_pickle=True)
@@ -151,7 +151,7 @@ def load_pooled(dataset, encoder_dir, metadata, patches, workers, cache_dir,
     return X, labels, patients
 
 
-def build_task(task_name, dataset_cache, metadata, fold):
+def build_task(task_name, dataset_cache, metadata, fold, n_splits=5):
     """
     Materialize one task from its dataset's cached features.
 
@@ -169,7 +169,7 @@ def build_task(task_name, dataset_cache, metadata, fold):
     yk = np.array([mapping[str(l)] for l in labels[keep]])
     pk = patients[keep]
 
-    train_p, test_p = patient_folds(metadata, spec['dataset'], fold)
+    train_p, test_p = patient_folds(metadata, spec['dataset'], fold, n_splits=n_splits)
     tr = np.isin(pk, train_p)
     te = np.isin(pk, test_p)
     n_classes = len(set(mapping.values()))
@@ -180,35 +180,61 @@ def build_task(task_name, dataset_cache, metadata, fold):
     return Xk[tr], yk[tr], Xk[te], yk[te], n_classes
 
 
-def fresh_probe_auc(X_tr, y_tr, X_te, y_te, n_classes, kind, seed=0):
-    if kind == 'logreg':
-        clf = make_pipeline(
-            StandardScaler(),
-            LogisticRegression(max_iter=2000, class_weight='balanced', C=1.0),
-        )
-    elif kind == 'mlp':
-        clf = make_pipeline(
-            StandardScaler(),
-            MLPClassifier(hidden_layer_sizes=(256,), max_iter=400, random_state=seed,
-                          early_stopping=True, n_iter_no_change=15),
-        )
-    else:
-        raise ValueError(kind)
+PROBE_FAMILIES = ('logreg', 'linsvm', 'rbfsvm', 'knn', 'rf', 'mlp', 'mlp_big')
 
+
+def _make_probe(kind, seed):
+    """
+    Probe families per plan.md section 15: if only one family fails, the evidence
+    is weak. `low_rank` scored 0.73 on an MLP while logreg recovered to 0.94 -
+    above baseline - so a single family is not evidence.
+    """
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.neighbors import KNeighborsClassifier
+    from sklearn.neural_network import MLPClassifier
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.svm import SVC
+
+    sc = StandardScaler()
+    if kind == 'logreg':
+        return make_pipeline(sc, LogisticRegression(max_iter=2000,
+                                                    class_weight='balanced'))
+    if kind == 'linsvm':
+        return make_pipeline(sc, SVC(kernel='linear', probability=True,
+                                     class_weight='balanced', random_state=seed))
+    if kind == 'rbfsvm':
+        return make_pipeline(sc, SVC(kernel='rbf', probability=True,
+                                     class_weight='balanced', random_state=seed))
+    if kind == 'knn':
+        return make_pipeline(sc, KNeighborsClassifier(n_neighbors=15))
+    if kind == 'rf':
+        return RandomForestClassifier(n_estimators=300, n_jobs=-1,
+                                      class_weight='balanced', random_state=seed)
+    if kind == 'mlp':
+        return make_pipeline(sc, MLPClassifier((256,), max_iter=400,
+                                               random_state=seed,
+                                               early_stopping=True,
+                                               n_iter_no_change=15))
+    if kind == 'mlp_big':
+        # High-capacity: the honest upper bound on recoverability.
+        return make_pipeline(sc, MLPClassifier((1024, 512), max_iter=1500,
+                                               random_state=seed, alpha=1e-5))
+    raise ValueError(f"unknown probe {kind!r}. Known: {PROBE_FAMILIES}")
+
+
+def fresh_probe_auc(X_tr, y_tr, X_te, y_te, n_classes, kind, seed=0):
+    clf = _make_probe(kind, seed)
     clf.fit(X_tr, y_tr)
     probs = clf.predict_proba(X_te)
-
-    # Map predict_proba columns (over classes seen in training) onto all classes.
     seen = clf.classes_ if hasattr(clf, 'classes_') else clf[-1].classes_
     full = np.zeros((len(X_te), n_classes))
     for j, c in enumerate(seen):
         full[:, int(c)] = probs[:, j]
-
     if n_classes == 2:
-        auc, note = macro_ovr_auc(y_te, full[:, 1], 2, strict=False)
-    else:
-        auc, note = macro_ovr_auc(y_te, full, n_classes, strict=False)
-    return auc, note
+        return macro_ovr_auc(y_te, full[:, 1], 2, strict=False)
+    return macro_ovr_auc(y_te, full, n_classes, strict=False)
 
 
 def evaluate(transform, tasks, probes):
@@ -256,11 +282,20 @@ def main():
                         default=['svd', 'spectral', 'leace'],
                         help="svd (affine null-space, the base method), "
                              "spectral (control-aware generalisation), leace, "
+                             "quadratic (2nd-order, ORACLE upper bound), "
                              "low_rank (invertible negative control)")
     parser.add_argument('--svd_ranks', type=int, nargs='+', default=[16, 64, 256])
     parser.add_argument('--lr_probe', type=float, default=1e-3)
     parser.add_argument('--probes', nargs='+', default=['logreg', 'mlp'])
     parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--code_dims', type=int, nargs='+', default=[64, 256, 512],
+                        help="bottleneck widths to sweep")
+    parser.add_argument('--lambda_bn', type=float, default=10.0,
+                        help="weight on HSIC(code, y_target)")
+    parser.add_argument('--bn_hidden', type=int, default=1024)
+    parser.add_argument('--bn_steps', type=int, default=800)
+    parser.add_argument('--bn_batch', type=int, default=256)
+    parser.add_argument('--bn_lr', type=float, default=1e-3)
     parser.add_argument('--spectral_lam', type=float, nargs='+',
                         default=[0.0, 0.5, 1.0, 2.0],
                         help="control-variance weight in the pencil; 0 = plain SVD")
@@ -377,6 +412,95 @@ def main():
                     print(f"    target variance captured "
                           f"{diag['target_variance_captured']:.4f}")
                     _apply(U, tag, order)
+
+        if 'svd_then_leace' in args.methods:
+            for k in args.svd_ranks:
+                tag = f"{target}|svd{k}_then_leace"
+                print(f"\n=== [{target}] affine SVD (k={k}) THEN LEACE ===", flush=True)
+                try:
+                    from src.unlearning.concept_erasure import LeaceFitter
+                    U = svd_subspace(torch.tensor(Xtr_t), k=k).to(device)
+                    mu = torch.tensor(Xtr_t, device=device).mean(0)
+                    step1 = lambda X: remove_subspace_affine(
+                        torch.tensor(X, device=device), U, mu)
+                    # Fit LEACE on what survives the projection.
+                    Z1 = step1(Xtr_t).cpu()
+                    z_oh = torch.nn.functional.one_hot(
+                        torch.tensor(ytr_t, dtype=torch.long),
+                        num_classes=tasks[target][4]).double()
+                    er = LeaceFitter.fit(Z1.double(), z_oh).eraser
+                    P = er.P.float().to(device); b = er.bias.float().to(device)
+                    fn = lambda X: (lambda t: ((t - b) @ P.T + b).cpu().numpy())(step1(X))
+                    matrix[tag] = evaluate(fn, tasks, args.probes)
+                    show(matrix[tag], order)
+                except Exception as e:
+                    print(f"    failed: {type(e).__name__}: {e}")
+
+        if 'bottleneck' in args.methods:
+            for cd in args.code_dims:
+                tag = f"{target}|bottleneck_m{cd}"
+                print(f"\n=== [{target}] nonlinear bottleneck (code={cd}, "
+                      f"lambda_t={args.lambda_bn}) ===", flush=True)
+                er = BottleneckEraser(input_dim=d, code_dim=cd,
+                                      hidden=args.bn_hidden).to(device)
+                fit_bottleneck(
+                    er,
+                    torch.tensor(Xtr_t, device=device),
+                    torch.tensor(ytr_t, device=device),
+                    Z_controls=[torch.tensor(tasks[c][0], device=device)
+                                for c in controls],
+                    lambda_t=args.lambda_bn, steps=args.bn_steps,
+                    batch_size=args.bn_batch, lr=args.bn_lr,
+                )
+                with torch.no_grad():
+                    Xte_t = torch.tensor(tasks[target][2], device=device)
+                    out = er(Xte_t)
+                    zc0 = Xte_t - Xte_t.mean(0, keepdim=True)
+                    zc1 = out - out.mean(0, keepdim=True)
+                    cos_c = float(torch.nn.functional.cosine_similarity(
+                        zc0, zc1, dim=-1).mean())
+                print(f"    centred cos(z, z') = {cos_c:.4f}   "
+                      f"(raw cosine is meaningless here - 98.8% shared mean)")
+                fn = lambda X, er=er: er(torch.tensor(X, device=device)).cpu().numpy()
+                matrix[tag] = evaluate(fn, tasks, args.probes)
+                matrix[tag]['_bn'] = {'code_dim': cd, 'centred_cosine': cos_c}
+                show(matrix[tag], order)
+
+        if 'quadratic' in args.methods:
+            tag = f"{target}|quadratic_oracle"
+            print(f"\n=== [{target}] quadratic (2nd-order) erasure "
+                  f"-- ORACLE UPPER BOUND ===", flush=True)
+            print("    Applied to the TARGET ONLY. A class-conditional optimal-transport")
+            print("    eraser maps each class to a shared barycenter, so it is not a fixed")
+            print("    transform and is undefined off-cohort. This bounds how much")
+            print("    second-order erasure can achieve, given oracle labels.")
+            try:
+                from src.unlearning.concept_erasure import QuadraticFitter
+                Xtr_o, ytr_o, Xte_o, yte_o, ncls_o = tasks[target]
+                fitter = QuadraticFitter.fit(torch.tensor(Xtr_o).double(),
+                                             torch.tensor(ytr_o).long())
+                q = fitter.eraser
+                Xa = q(torch.tensor(Xtr_o).double(), torch.tensor(ytr_o).long()).float().numpy()
+                Xb = q(torch.tensor(Xte_o).double(), torch.tensor(yte_o).long()).float().numpy()
+
+                res = {}
+                for kind in args.probes:
+                    res[kind], _ = fresh_probe_auc(Xa, ytr_o, Xb, yte_o, ncls_o, kind)
+                matrix[tag] = {target: res}
+                # Report how well the class-conditional moments were actually matched.
+                import numpy as _np
+                def moments(X_, y_):
+                    mus = _np.stack([X_[y_ == c].mean(0) for c in _np.unique(y_)])
+                    vs = _np.stack([X_[y_ == c].var(0).mean() for c in _np.unique(y_)])
+                    return float(_np.linalg.norm(mus - mus.mean(0), axis=1).mean()), vs
+                m0, v0 = moments(Xte_o, yte_o)
+                m1, v1 = moments(Xb, yte_o)
+                print(f"    class-mean spread   {m0:.4f} -> {m1:.4f}")
+                print(f"    class variances     {_np.round(v0, 3)} -> {_np.round(v1, 3)}")
+                show(matrix[tag], [target])
+            except Exception as e:
+                import traceback; traceback.print_exc()
+                print(f"    quadratic failed: {type(e).__name__}: {e}")
 
         if 'leace' in args.methods:
             tag = f"{target}|leace"

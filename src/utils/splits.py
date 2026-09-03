@@ -26,6 +26,9 @@ def patient_folds(metadata_path, dataset_target, fold, n_splits=N_SPLITS, seed=S
             f"{dataset_target} has {len(patients)} patients, need at least {n_splits}"
         )
 
+    if not 0 <= fold < n_splits:
+        raise ValueError(f"fold {fold} out of range for n_splits={n_splits}")
+
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
     train_idx, val_idx = list(kf.split(patients))[fold]
     return patients[train_idx], patients[val_idx]

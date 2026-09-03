@@ -12,6 +12,11 @@ __pycache__/
 *.pyc
 *.egg-info/
 
+# Generated sweep configs - regenerate with:
+#   python scripts/gen_configs.py --spec configs/sweep.yaml --out_dir configs/sweeps_full
+configs/sweeps/
+configs/sweeps_full/
+
 # Cloned repos
 INVEX_repo/
 
