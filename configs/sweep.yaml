@@ -1,10 +1,3 @@
-# Full grid: EVERY axis is crossed with all 5 folds.
-#
-# Earlier versions varied one key at a time from `base` (fold 0 only) and put
-# folds on a handful of `crosses`. That left 31 of 146 cells at n=1 - including
-# k=512 and the cross-cohort transfer configs, which carry the paper's headline
-# claims. Everything below is replicated across folds so no reported number
-# rests on a single run.
 base:
   fm: features_virchow2
   fold: 0
@@ -26,9 +19,7 @@ base:
   - BRACS-malignancy
   - UBC-OCEAN-subtype
   - BACH-histology
-
 axes: {}
-
 crosses:
   encoder:
     fm:
@@ -40,52 +31,133 @@ crosses:
     - features_conch_v15
     - features_ctranspath
     - features_virchow
-    fold: &folds [0, 1, 2, 3, 4]
-
+    fold: &id001
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
   rank:
-    k: [8, 16, 32, 64, 128, 256, 512]
-    fold: *folds
-
+    k:
+    - 8
+    - 16
+    - 32
+    - 64
+    - 128
+    - 256
+    - 512
+    fold: *id001
   method:
-    method: [svd, svd_plain, leace, low_rank, gaussian, dropout]
-    fold: *folds
-
+    method:
+    - svd
+    - svd_plain
+    - leace
+    - low_rank
+    - gaussian
+    - dropout
+    fold: *id001
   spectral:
-    method: [spectral]
-    spectral_lam: [0.0, 0.25, 0.5, 1.0, 2.0, 4.0]
-    fold: *folds
-
+    method:
+    - spectral
+    spectral_lam:
+    - 0.0
+    - 0.25
+    - 0.5
+    - 1.0
+    - 2.0
+    - 4.0
+    fold: *id001
   noise_sigma:
-    method: [gaussian]
-    sigma: [0.25, 0.5, 1.0, 2.0, 4.0]
-    fold: *folds
-
+    method:
+    - gaussian
+    sigma:
+    - 0.25
+    - 0.5
+    - 1.0
+    - 2.0
+    - 4.0
+    fold: *id001
   noise_dropout:
-    method: [dropout]
-    dropout_p: [0.1, 0.3, 0.5, 0.7, 0.9]
-    fold: *folds
-
+    method:
+    - dropout
+    dropout_p:
+    - 0.1
+    - 0.3
+    - 0.5
+    - 0.7
+    - 0.9
+    fold: *id001
   seed:
-    seed: [0, 1]
-    fold: *folds
-
+    seed:
+    - 0
+    - 1
+    fold: *id001
   probe_family:
     probes:
-    - [logreg, linsvm, rbfsvm, knn, rf, mlp, mlp_big]
-    fold: *folds
-
+    - - logreg
+      - linsvm
+      - rbfsvm
+      - knn
+      - rf
+      - mlp
+      - mlp_big
+    fold: *id001
   attacker_budget:
-    n_fit: [25, 50, 100, 250, 500, 1000, 2000]
-    fold: *folds
-
+    n_fit:
+    - 25
+    - 50
+    - 100
+    - 250
+    - 500
+    - 1000
+    - 2000
+    fold: *id001
   cross_cohort:
     fit_on:
     - BRACS-atypia
     - UBC-OCEAN-subtype
     - BACH-histology
     - PANDA-grade
-    fold: *folds
-
+    - TCGA-LUNG-subtype
+    fold: *id001
   sample_size:
-    max_slides: [600, 2000, 6000, null]
-    fold: *folds
+    max_slides:
+    - 600
+    - 2000
+    - 6000
+    - null
+    fold: *id001
+  rank_x_encoder:
+    k:
+    - 64
+    - 256
+    - 512
+    fm:
+    - features_virchow2
+    - features_hoptimus0
+    - features_uni_v2
+    - features_gigapath
+    - features_gpfm
+    - features_conch_v15
+    - features_ctranspath
+    - features_virchow
+    fold: &id002
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+  probe_x_rank:
+    probes:
+    - - logreg
+      - linsvm
+      - rbfsvm
+      - knn
+      - rf
+      - mlp
+      - mlp_big
+    k:
+    - 64
+    - 256
+    - 512
+    fold: *id002

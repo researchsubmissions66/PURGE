@@ -22,6 +22,7 @@
         <div class="nav-container">
             <a href="#" class="logo">PURG<span>E</span></a>
             <div class="nav-links">
+                <a href="#full-sweep">Full Sweep</a>
                 <a href="#methodology">Methodology</a>
                 <a href="#results">Clinical Cross-Evaluation</a>
                 <a href="https://github.com/researchsubmissions66/PURGE" target="_blank">GitHub Repository</a>
@@ -67,6 +68,20 @@
         </div>
         <div class="metric-card">
             <div class="metric-icon-wrap">
+                <i class="fas fa-cubes fa-2x" style="color: var(--primary)"></i>
+            </div>
+            <div class="metric-num">8</div>
+            <div class="metric-label">Foundation Models</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon-wrap">
+                <i class="fas fa-vials fa-2x" style="color: var(--primary)"></i>
+            </div>
+            <div class="metric-num">416</div>
+            <div class="metric-label">Sweep Configurations</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-icon-wrap">
                 <i class="fas fa-heartbeat fa-2x" style="color: var(--primary)"></i>
             </div>
             <div class="metric-num">4</div>
@@ -94,6 +109,163 @@
             <div class="metric-label">Processed Patches</div>
         </div>
     </div>
+
+    <!-- Full Sweep Results (authoritative) -->
+    <section id="full-sweep" class="animate-up">
+        <h2 class="section-title">Full 5-Fold Sweep &mdash; Authoritative Results</h2>
+        <p class="section-desc">
+            Every earlier number on this page came from a single fold. The sweep below crosses
+            <strong>every ablation axis with all 5 patient-grouped folds</strong> across
+            <strong>8 pathology foundation models</strong>: 416 configurations, zero failures.
+            Chance is 0.50 for every task (macro one-vs-rest AUC).
+        </p>
+
+        <div class="matrix-container">
+            <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                <i class="fas fa-crosshairs" style="color: var(--primary); margin-right: 8px;"></i>
+                The attack reaches chance &mdash; but only at high rank
+            </h3>
+            <div style="padding: 1.5rem;">
+                <p style="margin-bottom: 1rem; color: var(--gray);">
+                    Erased AUC, averaged over all 8 encoders &times; 5 folds (n = 40 per cell).
+                    At k = 64 the attack merely degrades; at k = 512 all three targets sit at chance,
+                    and this holds for every encoder tested.
+                </p>
+                <table style="margin: 0; width: 100%;">
+                    <thead>
+                        <tr><th>Subspace rank k</th><th>TCGA-LUNG (subtype)</th><th>PANDA (grade)</th><th>BRACS (atypia)</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>Baseline (no erasure)</strong></td><td>0.968</td><td>0.911</td><td>0.893</td></tr>
+                        <tr><td>k = 64</td><td>0.667</td><td>0.777</td><td>0.544</td></tr>
+                        <tr><td>k = 256</td><td>0.523</td><td>0.576</td><td>0.507</td></tr>
+                        <tr><td><strong>k = 512</strong></td><td><strong>0.506</strong></td><td><strong>0.517</strong></td><td><strong>0.496</strong></td></tr>
+                    </tbody>
+                </table>
+                <div style="margin-top: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); border-radius: 4px; font-size: 0.95rem; line-height: 1.5;">
+                    <strong>Interpretation:</strong> An earlier claim that the attack saturates around k = 64 was an
+                    artifact of a 600-slide cap, because the number of estimable directions is bounded by
+                    <em>k &le; n &minus; 1</em>. With the cap lifted, destruction is complete. The cost is that running
+                    at k = 512 requires at least 513 fitting slides from the target cohort.
+                </div>
+            </div>
+        </div>
+
+        <div class="matrix-container" style="margin-top: 2rem;">
+            <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                <i class="fas fa-exchange-alt" style="color: var(--primary); margin-right: 8px;"></i>
+                The central finding: the subspace is cohort-specific, not concept-specific
+            </h3>
+            <div style="padding: 1.5rem;">
+                <p style="margin-bottom: 1rem; color: var(--gray);">
+                    Fit the eraser on cohort A, apply it to cohort B. Erased AUC, k = 64, 5 folds per cell.
+                    The diagonal (shaded) is the only place erasure does anything.
+                </p>
+                <table style="margin: 0; width: 100%;">
+                    <thead>
+                        <tr><th>Eraser fitted on &darr;</th><th>BRACS (atypia)</th><th>PANDA (grade)</th><th>TCGA-LUNG (subtype)</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><strong>BRACS-atypia</strong></td><td style="background: rgba(59,130,246,.14);"><strong>0.583</strong></td><td>0.907</td><td>0.964</td></tr>
+                        <tr><td><strong>PANDA-grade</strong></td><td>0.901</td><td style="background: rgba(59,130,246,.14);"><strong>0.779</strong></td><td>0.964</td></tr>
+                        <tr><td><strong>TCGA-LUNG-subtype</strong></td><td>0.893</td><td>0.916</td><td style="background: rgba(59,130,246,.14);"><strong>0.615</strong></td></tr>
+                        <tr><td>BACH-histology (breast)</td><td>0.898</td><td>0.920</td><td>0.964</td></tr>
+                        <tr><td>UBC-OCEAN-subtype</td><td>0.887</td><td>0.914</td><td>0.950</td></tr>
+                    </tbody>
+                </table>
+                <div style="margin-top: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); border-radius: 4px; font-size: 0.95rem; line-height: 1.5;">
+                    <strong>Interpretation:</strong> BACH and BRACS are <em>both breast</em>. A subspace carrying
+                    a concept of breast atypia should transfer between them. It does not &mdash; BRACS is untouched at
+                    0.898. Worse, the five weakest configurations in the entire sweep are all cross-cohort runs, where
+                    the target <em>gains</em> accuracy while collateral damage rises to about +0.09: fitting on the wrong
+                    cohort harms the control tasks more than the intended target. What the erasure removes is the
+                    geometry of one cohort's feature distribution, not a portable clinical concept.
+                    <strong>This reframes linear-probe capability claims: a probe that scores 0.95 may be reading
+                    cohort structure that happens to correlate with the label.</strong>
+                </div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem; margin-top: 2rem;">
+            <div class="matrix-container" style="margin-top: 0;">
+                <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                    <i class="fas fa-bullseye" style="color: var(--primary); margin-right: 8px;"></i> Selectivity: the confound ladder
+                </h3>
+                <div style="padding: 1.5rem;">
+                    <p style="margin-bottom: 1rem; color: var(--gray);">Collateral damage to control tasks, grouped by how closely a control is related to the target. 3,516 control measurements.</p>
+                    <table style="margin: 0; width: 100%;">
+                        <thead><tr><th>Relation to target</th><th>AUC drop</th><th>n</th></tr></thead>
+                        <tbody>
+                            <tr><td>Different organ</td><td><strong>+0.003</strong></td><td>2,647</td></tr>
+                            <tr><td>Same organ, other cohort</td><td>+0.011</td><td>263</td></tr>
+                            <tr><td>Same slides, different label</td><td>+0.062</td><td>606</td></tr>
+                        </tbody>
+                    </table>
+                    <div style="margin-top: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); border-radius: 4px; font-size: 0.95rem; line-height: 1.5;">
+                        <strong>Interpretation:</strong> Damage scales cleanly with proximity to the target and is
+                        indistinguishable from zero across organs. The attack is precise.
+                    </div>
+                </div>
+            </div>
+
+            <div class="matrix-container" style="margin-top: 0;">
+                <h3 style="padding: 1.25rem; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                    <i class="fas fa-layer-group" style="color: var(--primary); margin-right: 8px;"></i> Accessibility, not deletion
+                </h3>
+                <div style="padding: 1.5rem;">
+                    <p style="margin-bottom: 1rem; color: var(--gray);">The same erased features, read by probes of increasing capacity (k = 64, 5 folds).</p>
+                    <table style="margin: 0; width: 100%;">
+                        <thead><tr><th>Probe</th><th>BRACS</th><th>PANDA</th><th>TCGA-LUNG</th></tr></thead>
+                        <tbody>
+                            <tr><td>Logistic regression</td><td>0.455</td><td>0.565</td><td>0.534</td></tr>
+                            <tr><td>MLP</td><td>0.583</td><td>0.779</td><td>0.615</td></tr>
+                            <tr><td>Larger MLP</td><td><strong>0.616</strong></td><td><strong>0.804</strong></td><td><strong>0.759</strong></td></tr>
+                        </tbody>
+                    </table>
+                    <div style="margin-top: 1rem; padding: 1rem; background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); border-radius: 4px; font-size: 0.95rem; line-height: 1.5;">
+                        <strong>Interpretation:</strong> Recovery increases monotonically with readout capacity, so
+                        subspace removal degrades <em>accessibility</em> rather than destroying content. This also
+                        explains why eleven alternative erasure methods failed: they were chasing a residual that was
+                        never deleted.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="matrix-container" style="margin-top: 2rem;">
+            <h3 style="padding: 1.25rem; margin: 0; background: #fffbeb; border-bottom: 1px solid #fde68a; font-size: 1.1rem; color: var(--dark); border-radius: var(--radius) var(--radius) 0 0;">
+                <i class="fas fa-exclamation-triangle" style="color: #d97706; margin-right: 8px;"></i>
+                Corrections to previously reported results
+            </h3>
+            <div style="padding: 1.5rem; font-size: 0.95rem; line-height: 1.6; color: var(--gray);">
+                <p style="margin-bottom: .9rem;">
+                    <strong style="color: var(--dark);">Aggregation defect.</strong> The analysis helper that restricts
+                    results to the base configuration did not exclude cross-cohort runs or the extended probe family.
+                    Because a cross-cohort run matches the base configuration on every other field, and its erased AUC is
+                    high by construction, those runs were averaged into the headline means. Corrected values are
+                    <em>stronger</em> than previously reported (for example TCGA-LUNG 0.615 rather than 0.666). The same
+                    defect produced an apparent mismatch between the spectral objective at &lambda;=0 and plain SVD;
+                    the two subspaces are in fact identical to six decimal places.
+                </p>
+                <p style="margin-bottom: .9rem;">
+                    <strong style="color: var(--dark);">MIL erasers were fitted on the wrong distribution.</strong> The
+                    multiple-instance pipeline fitted its eraser on <em>patch</em> embeddings while the main sweep fits on
+                    <em>slide-mean</em> vectors. These span different subspaces (mean principal cosine 0.698). On
+                    TCGA-LUNG fold 0 the patch-fitted eraser moved AUC from 0.954 to 0.918, whereas the slide-mean
+                    eraser moved it to 0.536. Every MIL result that depended on an eraser has been withdrawn, including
+                    the previously reported claim that attention-based MIL resists erasure by roughly 4&times;. Those runs
+                    are being repeated with the corrected protocol.
+                </p>
+                <p style="margin-bottom: 0;">
+                    <strong style="color: var(--dark);">Still outstanding.</strong> Whether attention-based MIL
+                    (ABMIL, TransMIL) resists the corrected attack is not yet known, and it determines whether this work
+                    reports a practical attack or a methodological critique of probe-based capability claims. Interpretability
+                    analyses of the removed subspace &mdash; pairwise subspace overlap between cohorts, and what the deleted
+                    coordinates encode &mdash; are in progress.
+                </p>
+            </div>
+        </div>
+    </section>
 
     <!-- Methodology Section -->
     <section id="methodology" class="animate-up">

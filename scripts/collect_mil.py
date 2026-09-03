@@ -3,7 +3,9 @@ import argparse, glob, json, os, re
 import numpy as np, pandas as pd
 
 BASE = re.compile(r'^base_(?P<ds>.+)_(?P<model>abmil|transmil|meanmil)_f(?P<fold>\d+)\.json$')
-ERAS = re.compile(r'^erase-(?P<organ>[A-Z]+)_(?P<ds>.+)_(?P<model>abmil|transmil|meanmil)_f(?P<fold>\d+)\.json$')
+# erase-ORGAN_* was the old organ-level patch-fitted eraser (quarantined).
+# erase_* is the current per-(dataset, fold) slide-mean eraser.
+ERAS = re.compile(r'^erase[_-](?P<organ>[A-Z]+_)?(?P<ds>.+)_(?P<model>abmil|transmil|meanmil)_f(?P<fold>\d+)\.json$')
 
 
 def main():
@@ -25,7 +27,7 @@ def main():
             continue
         g = m.groupdict()
         rows.append(dict(dataset=g['ds'], model=g['model'], fold=int(g['fold']),
-                         organ=g.get('organ', 'NONE'), auc=auc,
+                         organ=(g.get('organ') or 'SELF').rstrip('_'), auc=auc,
                          val_auc=d.get('val_auc'), n_test=d.get('n_test')))
     if not rows:
         raise SystemExit(f"no MIL results in {a.out_dir}")
